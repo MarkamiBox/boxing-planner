@@ -9,7 +9,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef(null);
   const logsInputRef = useRef(null);
-  
+
   const { schedule, setSchedule } = useAppState();
 
   const handleChange = (field, value) => {
@@ -32,7 +32,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
   const handleExportJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(schedule, null, 2));
     const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", "boxing_schedule_" + new Date().toISOString().split('T')[0] + ".json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
@@ -235,11 +235,11 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         <span>{label}</span>
         <span className="level-val">{localProfile.levels[fieldKey]}/5</span>
       </div>
-      <input 
-        type="range" 
-        min="1" 
-        max="5" 
-        value={localProfile.levels[fieldKey]} 
+      <input
+        type="range"
+        min="1"
+        max="5"
+        value={localProfile.levels[fieldKey]}
         onChange={e => handleLevelChange(fieldKey, Number(e.target.value))}
       />
     </div>
@@ -253,13 +253,12 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
           <button className="btn-secondary export-btn" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #b91c1c, #7c3aed)', color: 'white', border: 'none', fontWeight: 700 }}>
             {copied ? <><Check size={18} /> Copied!</> : <>Coach Export</>}
           </button>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Copy → paste into ChatGPT</span>
         </div>
       </div>
 
       <div className="card profile-grid">
         <h3 className="section-title" style={{ gridColumn: '1 / -1' }}>Physical Stats</h3>
-        
+
         <div className="form-group">
           <label>Age Bracket</label>
           <input type="text" value={localProfile.age} onChange={e => handleChange('age', e.target.value)} />
@@ -282,7 +281,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         </div>
 
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Boxing Style</h3>
-        
+
         <div className="form-group">
           <label>Experience</label>
           <input type="text" value={localProfile.experience} onChange={e => handleChange('experience', e.target.value)} />
@@ -294,9 +293,9 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         <div className="form-group">
           <label>Stance</label>
           <select value={localProfile.stance || 'Orthodox'} onChange={e => handleChange('stance', e.target.value)}>
-             <option value="Orthodox">Orthodox</option>
-             <option value="Southpaw">Southpaw</option>
-             <option value="Switch">Switch</option>
+            <option value="Orthodox">Orthodox</option>
+            <option value="Southpaw">Southpaw</option>
+            <option value="Switch">Switch</option>
           </select>
         </div>
         <div className="form-group">
@@ -305,7 +304,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         </div>
 
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Technical Levels (1-5)</h3>
-        
+
         <div className="levels-grid" style={{ gridColumn: '1 / -1' }}>
           {renderLevelSlider("Cardio / Stamina", "cardio")}
           {renderLevelSlider("Technique", "technique")}
@@ -336,12 +335,12 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
           <button className="btn-secondary" style={{ flex: 1 }} onClick={() => fileInputRef.current.click()}>
             <Upload size={18} /> Import Schedule
           </button>
-          <input 
-            type="file" 
-            accept=".json" 
-            ref={fileInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleImportJSON} 
+          <input
+            type="file"
+            accept=".json"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={handleImportJSON}
           />
         </div>
 
@@ -353,12 +352,12 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
           <button className="btn-secondary" style={{ flex: 1 }} onClick={() => logsInputRef.current.click()}>
             <Upload size={18} /> Import Logs
           </button>
-          <input 
-            type="file" 
-            accept=".json" 
-            ref={logsInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleImportLogs} 
+          <input
+            type="file"
+            accept=".json"
+            ref={logsInputRef}
+            style={{ display: 'none' }}
+            onChange={handleImportLogs}
           />
         </div>
       </div>
