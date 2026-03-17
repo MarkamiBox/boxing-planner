@@ -1,0 +1,122 @@
+/* Navigation Styles */
+.mobile-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--surface);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem;
+  z-index: 50;
+  padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 0.5rem;
+  flex: 1;
+}
+
+.nav-btn.active {
+  color: var(--primary);
+}
+
+.nav-btn span {
+  font-weight: 500;
+}
+
+/* Desktop Sidebar */
+.desktop-sidebar {
+  display: none;
+  width: 240px;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border-color);
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+}
+
+.sidebar-header {
+  padding: 2rem 1.5rem;
+}
+
+.logo {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.logo .dot {
+  color: var(--primary);
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0 1rem;
+  gap: 0.5rem;
+}
+
+.sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-radius: 0.75rem;
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 500;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-btn:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-main);
+}
+
+.sidebar-btn.active {
+  background-color: rgba(185, 28, 28, 0.1); /* Primary with opacity */
+  color: var(--primary);
+}
+
+@media (min-width: 768px) {
+  .mobile-nav {
+    display: none;
+  }
+  .desktop-sidebar {
+    display: flex;
+  }
+  .main-content {
+    margin-left: 240px; /* Sidebar width */
+  }
+}
+
+/* Page Transitions */
+.page-container {
+  animation: fadeIn var(--transition-normal);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Simple typography utilities */
+h1.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
