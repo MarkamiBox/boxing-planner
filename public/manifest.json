@@ -1,0 +1,18 @@
+{
+  "name": "Boxing Planner",
+  "short_name": "BoxingPlan",
+  "description": "Your personal boxing training planner and logger.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#b91c1c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

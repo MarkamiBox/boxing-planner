@@ -91,10 +91,11 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
   };
 
   const handleExport = () => {
-    // Generate text
-    const logs = JSON.parse(window.localStorage.getItem('bxng_logs') || '[]');
+    const recentFull = logs.filter(l => l.energy > 0).slice(0, 10);
     const lastBoxing = logs.find(l => l.type === 'Boxing');
     const lastRunning = logs.find(l => l.type === 'Running');
+    const withWeight = logs.filter(l => l.bodyWeight);
+    const withSleep = logs.filter(l => l.sleepHours);
     
     let text = `🏋️ ATHLETE PROFILE 🥊\n`;
     text += `Age: ${localProfile.age} | Weight: ${localProfile.weight}kg | Height: ${localProfile.height || '-'}cm\n`;
@@ -105,10 +106,22 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
     text += `Cardio: ${localProfile.levels.cardio} | Technique: ${localProfile.levels.technique} | Footwork: ${localProfile.levels.footwork}\n`;
     text += `Defense: ${localProfile.levels.defense} | Jab: ${localProfile.levels.jab} | Ring IQ/Reading: ${localProfile.levels.reading}\n\n`;
 
+    if (withWeight.length > 0) {
+      const last = withWeight[0];
+      text += `⚖️ BODY WEIGHT (last: ${last.date})\n`;
+      text += `${last.bodyWeight}kg\n\n`;
+    }
+
+    if (withSleep.length > 0) {
+      const avgSleep = (withSleep.reduce((a, l) => a + l.sleepHours, 0) / withSleep.length).toFixed(1);
+      text += `🛌 SLEEP (avg last ${withSleep.length} sessions)\n`;
+      text += `Avg ${avgSleep}h/night\n\n`;
+    }
+
     if (lastBoxing) {
       text += `🥊 LAST BOXING SESSION (${lastBoxing.date})\n`;
-      text += `Rounds: ${lastBoxing.sparringRounds} | Drop: ${lastBoxing.lastRoundDrop}/10\n`;
-      text += `Energy: ${lastBoxing.energy}/10 | Notes: ${lastBoxing.notes}\n\n`;
+      text += `Rounds: ${lastBoxing.sparringRounds || '-'} | Drop: ${lastBoxing.lastRoundDrop || '-'}/10\n`;
+      text += `Energy: ${lastBoxing.energy}/10 | Focus: ${lastBoxing.focus || '-'}/10 | Notes: ${lastBoxing.notes}\n\n`;
     }
 
     if (lastRunning) {
@@ -117,14 +130,15 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
       text += `Cardio/Legs feel: ${lastRunning.cardio}/10 ${lastRunning.legs}/10\n\n`;
     }
 
-    const recentLogs = logs.slice(Math.max(logs.length - 5, 0)).reverse();
-    if (recentLogs.length > 0) {
-      text += `📅 RECENT SESSIONS HISTORY\n`;
-      recentLogs.forEach(log => {
-        text += `- ${log.date}: [${log.type}] ${log.name || ''} | Energy: ${log.energy}/10 | Cardio: ${log.cardio}/10\n`;
+    if (recentFull.length > 0) {
+      text += `📅 RECENT 10 SESSIONS\n`;
+      recentFull.forEach(log => {
+        text += `- ${log.date} [${log.type}] ${log.name || ''} | E:${log.energy} C:${log.cardio} I:${log.intensity || '-'} F:${log.focus || '-'} Dur:${log.duration || '-'}\n`;
       });
       text += '\n';
     }
+
+    text += `\n---\nPlease analyze my training data and give me feedback on my progress, recovery, and what to focus on next.`;
 
     // fallback copy logic
     if (navigator.clipboard && window.isSecureContext) {

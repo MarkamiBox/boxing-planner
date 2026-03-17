@@ -8,6 +8,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   const [activeDay, setActiveDay] = useState('monday');
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', steps: [] });
 
@@ -122,29 +123,24 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     setSchedule(newSchedule);
   };
 
-  const copyPreviousWeek = () => {
-    if (!weeks || !currentWeekId) return;
-    const { y, w } = parseWeek(currentWeekId);
-    let prevW = w - 1; let prevY = y;
-    if (prevW < 1) { prevW = 52; prevY--; }
-    const prevId = getWeekString(prevY, prevW);
-    
-    if (weeks[prevId]) {
-      showConfirm("Copia Settimana", "Vuoi sovrascrivere questa settimana copiando la precedente?", () => {
-         const cloned = JSON.parse(JSON.stringify(weeks[prevId]));
-         Object.keys(cloned).forEach(day => cloned[day].forEach(ex => { ex.done = false; ex.logId = null; }));
-         setSchedule(cloned);
-      });
-    } else {
-      showAlert("Attenzione", "Non ci sono dati nella settimana precedente da copiare.");
-    }
+  const moveExercise = (day, idx, dir) => {
+    const newSchedule = { ...schedule };
+    const arr = [...newSchedule[day]];
+    const target = idx + dir;
+    if (target < 0 || target >= arr.length) return;
+    [arr[idx], arr[target]] = [arr[target], arr[idx]];
+    newSchedule[day] = arr;
+    setSchedule(newSchedule);
   };
 
-  const clearWeek = () => {
-    showConfirm("Svuota Settimana", "Sei sicuro di voler svuotare questa settimana? Tutti gli allenamenti programmati verranno rimossi.", () => {
-       const empty = { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
-       setSchedule(empty);
-    });
+  const copyExerciseTo = (ex, targetDay) => {
+    const newSchedule = { ...schedule };
+    const cloned = JSON.parse(JSON.stringify(ex));
+    cloned.id = Date.now().toString();
+    cloned.done = false;
+    newSchedule[targetDay] = [...(newSchedule[targetDay] || []), cloned];
+    setSchedule(newSchedule);
+    setCopyPickerFor(null);
   };
 
   const addExercise = (day) => {
@@ -253,6 +249,13 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
   const activeExercises = schedule[activeDay] || [];
 
+  const getDayCompletion = (day) => {
+    const exs = schedule[day] || [];
+    if (exs.length === 0) return null;
+    const done = exs.filter(e => e.done).length;
+    return { done, total: exs.length };
+  };
+
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -268,35 +271,37 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
   return (
     <div className="page-container schedule-view">
-      <div className="schedule-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <h1 className="page-title" style={{ margin: 0 }}>Schedule</h1>
-          {currentWeekId && (
-            <div className="week-nav">
-              <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
-              <span className="week-range-text">
-                {getWeekDateRange(currentWeekId)}
-              </span>
-              <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '4px' }}>
-          <button className="btn-text" style={{ fontSize: '0.85rem', padding: '0', color: 'var(--primary)', fontWeight: 600 }} onClick={copyPreviousWeek}>+ Copia Prev</button>
-          <button className="btn-text" style={{ fontSize: '0.85rem', padding: '0', color: 'var(--text-muted)' }} onClick={clearWeek}>Svuota Settimana</button>
-        </div>
+      <div className="schedule-header">
+        <h1 className="page-title">Schedule</h1>
+        {currentWeekId && (
+          <div className="week-nav">
+            <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
+            <span className="week-range-text">
+              {getWeekDateRange(currentWeekId)}
+            </span>
+            <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
+          </div>
+        )}
       </div>
 
       <div className="days-selector">
-        {daysOfWeek.map(day => (
-          <button 
-            key={day} 
-            className={`day-btn ${activeDay === day ? 'active' : ''}`}
-            onClick={() => setActiveDay(day)}
-          >
-            {day.substring(0, 3).toUpperCase()}
-          </button>
-        ))}
+        {daysOfWeek.map(day => {
+          const comp = getDayCompletion(day);
+          return (
+            <button
+              key={day}
+              className={`day-btn ${activeDay === day ? 'active' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
+              onClick={() => setActiveDay(day)}
+            >
+              {day.substring(0, 3).toUpperCase()}
+              {comp && (
+                <span style={{ display: 'block', fontSize: '0.6rem', opacity: 0.8, marginTop: '1px' }}>
+                  {comp.done}/{comp.total}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="exercises-list">
@@ -310,7 +315,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         {activeExercises.length === 0 ? (
           <div className="empty-state">Rest day. No exercises planned.</div>
         ) : (
-          activeExercises.map(ex => (
+          activeExercises.map((ex, exIdx) => (
             <div key={ex.id} className={`exercise-card ${ex.done ? 'done' : ''}`}>
               {editingId === ex.id ? (
                 <div className="exercise-editor">
@@ -424,6 +429,37 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                     <button className="btn-icon edit-btn" onClick={() => startEdit(ex)}>
                       <Edit2 size={18} />
                     </button>
+                    
+                    {/* Move up/down */}
+                    {exIdx > 0 && (
+                      <button className="btn-icon" style={{ padding: '4px', opacity: 0.6, fontSize: '0.7rem' }} title="Move Up" onClick={() => moveExercise(activeDay, exIdx, -1)}>
+                        <ChevronUp size={15}/>
+                      </button>
+                    )}
+                    {exIdx < activeExercises.length - 1 && (
+                      <button className="btn-icon" style={{ padding: '4px', opacity: 0.6, fontSize: '0.7rem' }} title="Move Down" onClick={() => moveExercise(activeDay, exIdx, 1)}>
+                        <ChevronDown size={15}/>
+                      </button>
+                    )}
+
+                    {/* Copy to day */}
+                    <div style={{ position: 'relative' }}>
+                      <button className="btn-icon" style={{ padding: '4px', fontSize: '0.7rem' }} title="Copy to another day" onClick={() => setCopyPickerFor(copyPickerFor === ex.id ? null : ex.id)}>
+                        <Plus size={15}/>
+                      </button>
+                      {copyPickerFor === ex.id && (
+                        <div style={{ position: 'absolute', right: '100%', top: 0, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.5rem', zIndex: 50, minWidth: '90px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>Copy to:</div>
+                          {daysOfWeek.filter(d => d !== activeDay).map(d => (
+                            <button key={d} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 6px', fontSize: '0.8rem', color: 'var(--text-main)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '3px' }}
+                              onMouseEnter={e => e.target.style.background = 'var(--surface-hover)'}
+                              onMouseLeave={e => e.target.style.background = 'none'}
+                              onClick={() => copyExerciseTo(ex, d)}
+                            >{d.charAt(0).toUpperCase() + d.slice(1, 3)}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

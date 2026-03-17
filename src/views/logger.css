@@ -59,6 +59,7 @@
 
 .form-slider {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   height: 6px;
   background: var(--surface-hover);
@@ -126,4 +127,44 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+/* Buttons used in log edit mode */
+.btn-secondary {
+  background-color: var(--surface-hover);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-icon {
+  background-color: var(--surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-icon:hover { background-color: var(--surface-hover); }
+.btn-icon.danger:hover { color: #ef4444; border-color: #ef4444; }
+
+.btn-text {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
