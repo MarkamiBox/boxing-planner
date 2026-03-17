@@ -128,16 +128,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
     // Skipped steps in recent sessions
     const totalSkipped = recentFull.reduce((a, l) => a + (l.skippedSteps || 0), 0);
 
-    let text = '';
-
-    // ── ROLE ────────────────────────────────────────────────────────────────────
-    text += `You are my personal boxing coach and strength & conditioning advisor. I'm going to give you my complete athlete profile and training history. Your job is to:\n`;
-    text += `1. Analyze my current state and recent training.\n`;
-    text += `2. Give me a DETAILED WORKOUT for TODAY (${today}) — format it step by step with sets, reps, rounds, rest times.\n`;
-    text += `3. Build me a COMPLETE NEXT WEEK TRAINING SCHEDULE (Mon–Sun) with each day clearly labeled.\n`;
-    text += `4. Give me 2–3 specific coaching tips on what I need to improve MOST based on my data.\n`;
-    text += `5. Flag any recovery concerns if you see signs of overtraining or insufficient rest.\n\n`;
-    text += `Be direct, specific, and talk to me like a real coach. Format clearly with headers.\n\n`;
+    let text = `Boxing Planner — athlete data export (${today})\n\n`;
 
     // ── ATHLETE PROFILE ──────────────────────────────────────────────────────────
     text += `═══════════════════════════════════════\n`;
@@ -215,32 +206,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
       text += '\n';
     }
 
-    // ── REQUEST ───────────────────────────────────────────────────────────────────
-    text += `═══════════════════════════════════════\n`;
-    text += `📋 WHAT I NEED FROM YOU\n`;
-    text += `═══════════════════════════════════════\n\n`;
-    text += `**1. TODAY'S WORKOUT** (${today} — ${todayDayName})\n`;
-    text += `Give me an appropriate workout for today considering my recent fatigue level, days since last session, and soreness. Include:\n`;
-    text += `- Warm-up (10–15 min with specific exercises)\n`;
-    text += `- Main block (rounds/sets/reps clearly stated, rest times clearly stated)\n`;
-    text += `- Cool-down & mobility\n`;
-    text += `- Total expected duration\n\n`;
-    text += `**2. NEXT WEEK SCHEDULE (Mon–Sun)**\n`;
-    text += `Build me a full week plan. For each day tell me:\n`;
-    text += `- Session type and name\n`;
-    text += `- Main focus/goal of the session\n`;
-    text += `- Approximate duration\n`;
-    text += `- Any specific exercises or drills I should do\n`;
-    text += `Respect my current level and don't overload me. Include at least 1 full rest day and 1 active recovery day.\n\n`;
-    text += `**3. TOP COACHING PRIORITIES**\n`;
-    text += `Based on my profile and data, what are the 2–3 things I should focus on most right now to improve fastest? Be specific — not generic advice.\n\n`;
-    text += `**4. RECOVERY / RED FLAGS**\n`;
-    text += `Do you see any warning signs in my data? Am I overtraining, under-recovering, or missing something important?\n\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `Note: Format the schedule clearly so I can copy it into my Boxing Planner app. Use simple structure:\n`;
-    text += `Monday: [Session Name] — [Duration] — [Focus]\nTuesday: REST / Active Recovery\netc.`;
 
-    // ── COPY TO CLIPBOARD ─────────────────────────────────────────────────────────
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(() => {
         setCopied(true);
