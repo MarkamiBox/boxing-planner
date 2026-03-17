@@ -91,63 +91,162 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
   };
 
   const handleExport = () => {
-    const recentFull = logs.filter(l => l.energy > 0).slice(0, 10);
+    const today = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayISO = new Date().toISOString().split('T')[0];
+    const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+    const recentFull = logs.filter(l => l.energy > 0).slice(0, 15);
     const lastBoxing = logs.find(l => l.type === 'Boxing');
     const lastRunning = logs.find(l => l.type === 'Running');
     const withWeight = logs.filter(l => l.bodyWeight);
     const withSleep = logs.filter(l => l.sleepHours);
-    
-    let text = `🏋️ ATHLETE PROFILE 🥊\n`;
-    text += `Age: ${localProfile.age} | Weight: ${localProfile.weight}kg | Height: ${localProfile.height || '-'}cm\n`;
-    text += `Resting HR: ${localProfile.restingHR}bpm | Est. VO2max: ${localProfile.vo2max}\n`;
-    text += `Experience: ${localProfile.experience} | Stance: ${localProfile.stance || 'Orthodox'} | Style: ${localProfile.style} | Main: ${localProfile.primaryPunch}\n\n`;
-    
-    text += `📊 TECHNICAL LEVELS (1-5)\n`;
-    text += `Cardio: ${localProfile.levels.cardio} | Technique: ${localProfile.levels.technique} | Footwork: ${localProfile.levels.footwork}\n`;
-    text += `Defense: ${localProfile.levels.defense} | Jab: ${localProfile.levels.jab} | Ring IQ/Reading: ${localProfile.levels.reading}\n\n`;
 
-    if (withWeight.length > 0) {
-      const last = withWeight[0];
-      text += `⚖️ BODY WEIGHT (last: ${last.date})\n`;
-      text += `${last.bodyWeight}kg\n\n`;
-    }
+    // Compute trends
+    const avgEnergy = recentFull.length > 0
+      ? (recentFull.reduce((a, l) => a + l.energy, 0) / recentFull.length).toFixed(1)
+      : '-';
+    const avgCardio = recentFull.length > 0
+      ? (recentFull.reduce((a, l) => a + (l.cardio || 0), 0) / recentFull.length).toFixed(1)
+      : '-';
+    const avgFocus = recentFull.filter(l => l.focus > 0).length > 0
+      ? (recentFull.filter(l => l.focus > 0).reduce((a, l) => a + l.focus, 0) / recentFull.filter(l => l.focus > 0).length).toFixed(1)
+      : '-';
+    const avgSleep = withSleep.length > 0
+      ? (withSleep.slice(0, 7).reduce((a, l) => a + l.sleepHours, 0) / Math.min(withSleep.length, 7)).toFixed(1)
+      : null;
+    const lastWeight = withWeight.length > 0 ? withWeight[0].bodyWeight : null;
+    const lastSoreness = recentFull.length > 0 && recentFull[0].musclesSoreness
+      ? recentFull[0].musclesSoreness
+      : null;
 
-    if (withSleep.length > 0) {
-      const avgSleep = (withSleep.reduce((a, l) => a + l.sleepHours, 0) / withSleep.length).toFixed(1);
-      text += `🛌 SLEEP (avg last ${withSleep.length} sessions)\n`;
-      text += `Avg ${avgSleep}h/night\n\n`;
-    }
+    // Days since last session
+    const lastSessionDate = recentFull.length > 0 ? recentFull[0].date : null;
+    const daysSinceLast = lastSessionDate
+      ? Math.round((new Date(todayISO) - new Date(lastSessionDate)) / 86400000)
+      : null;
 
+    // Skipped steps in recent sessions
+    const totalSkipped = recentFull.reduce((a, l) => a + (l.skippedSteps || 0), 0);
+
+    let text = '';
+
+    // ── ROLE ────────────────────────────────────────────────────────────────────
+    text += `You are my personal boxing coach and strength & conditioning advisor. I'm going to give you my complete athlete profile and training history. Your job is to:\n`;
+    text += `1. Analyze my current state and recent training.\n`;
+    text += `2. Give me a DETAILED WORKOUT for TODAY (${today}) — format it step by step with sets, reps, rounds, rest times.\n`;
+    text += `3. Build me a COMPLETE NEXT WEEK TRAINING SCHEDULE (Mon–Sun) with each day clearly labeled.\n`;
+    text += `4. Give me 2–3 specific coaching tips on what I need to improve MOST based on my data.\n`;
+    text += `5. Flag any recovery concerns if you see signs of overtraining or insufficient rest.\n\n`;
+    text += `Be direct, specific, and talk to me like a real coach. Format clearly with headers.\n\n`;
+
+    // ── ATHLETE PROFILE ──────────────────────────────────────────────────────────
+    text += `═══════════════════════════════════════\n`;
+    text += `🥊 ATHLETE PROFILE\n`;
+    text += `═══════════════════════════════════════\n`;
+    text += `Today's date: ${today}\n`;
+    text += `Age range: ${localProfile.age}\n`;
+    text += `Body weight: ${lastWeight ? lastWeight + 'kg' : localProfile.weight + 'kg (from profile)'}\n`;
+    text += `Height: ${localProfile.height || '-'}cm\n`;
+    text += `Stance: ${localProfile.stance || 'Orthodox'}\n`;
+    text += `Boxing experience: ${localProfile.experience}\n`;
+    text += `Style: ${localProfile.style}\n`;
+    text += `Primary weapon: ${localProfile.primaryPunch}\n`;
+    text += `Resting HR: ${localProfile.restingHR}bpm\n`;
+    text += `Est. VO2max: ${localProfile.vo2max}\n\n`;
+
+    // ── TECHNICAL LEVELS ─────────────────────────────────────────────────────────
+    text += `📊 TECHNICAL LEVELS (1=beginner, 5=advanced)\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    const lvl = localProfile.levels;
+    text += `Cardio/Conditioning:  ${'█'.repeat(lvl.cardio)}${'░'.repeat(5 - lvl.cardio)} ${lvl.cardio}/5\n`;
+    text += `Technique/Craft:      ${'█'.repeat(lvl.technique)}${'░'.repeat(5 - lvl.technique)} ${lvl.technique}/5\n`;
+    text += `Footwork/Movement:    ${'█'.repeat(lvl.footwork)}${'░'.repeat(5 - lvl.footwork)} ${lvl.footwork}/5\n`;
+    text += `Defense/Head movement:${'█'.repeat(lvl.defense)}${'░'.repeat(5 - lvl.defense)} ${lvl.defense}/5\n`;
+    text += `Jab/Combo speed:      ${'█'.repeat(lvl.jab)}${'░'.repeat(5 - lvl.jab)} ${lvl.jab}/5\n`;
+    text += `Ring IQ/Reading:      ${'█'.repeat(lvl.reading)}${'░'.repeat(5 - lvl.reading)} ${lvl.reading}/5\n\n`;
+
+    // ── CURRENT STATE ─────────────────────────────────────────────────────────────
+    text += `⚡ CURRENT STATE\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (daysSinceLast !== null) text += `Days since last session: ${daysSinceLast}\n`;
+    if (lastSoreness !== null) text += `Muscle soreness last logged: ${lastSoreness}/10 ${lastSoreness >= 7 ? '⚠️ HIGH' : lastSoreness >= 4 ? '⚡ MODERATE' : '✅ LOW'}\n`;
+    if (avgSleep) text += `Avg sleep (last 7 sessions): ${avgSleep}h/night ${Number(avgSleep) < 6.5 ? '⚠️ LOW — recovery may be compromised' : '✅'}\n`;
+    if (lastWeight) text += `Last weighed: ${lastWeight}kg (${withWeight[0].date})\n`;
+    text += `\nRecent avg performance (last ${recentFull.length} rated sessions):\n`;
+    text += `  Energy:    ${avgEnergy}/10\n`;
+    text += `  Cardio:    ${avgCardio}/10\n`;
+    text += `  Focus:     ${avgFocus}/10\n`;
+    if (totalSkipped > 0) text += `  Guided steps skipped in recent sessions: ${totalSkipped} (indicates fatigue or time constraints)\n`;
+    text += '\n';
+
+    // ── BOXING DETAILS ────────────────────────────────────────────────────────────
     if (lastBoxing) {
       text += `🥊 LAST BOXING SESSION (${lastBoxing.date})\n`;
-      text += `Rounds: ${lastBoxing.sparringRounds || '-'} | Drop: ${lastBoxing.lastRoundDrop || '-'}/10\n`;
-      text += `Energy: ${lastBoxing.energy}/10 | Focus: ${lastBoxing.focus || '-'}/10 | Notes: ${lastBoxing.notes}\n\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `Name: ${lastBoxing.name || 'General Boxing'}\n`;
+      text += `Duration: ${lastBoxing.duration || '-'}\n`;
+      text += `Sparring rounds: ${lastBoxing.sparringRounds || 0}\n`;
+      if (lastBoxing.sparringRounds > 0) text += `End-of-session performance drop: ${lastBoxing.lastRoundDrop}/10 ${lastBoxing.lastRoundDrop < 5 ? '(significant gas tank issue)' : ''}\n`;
+      text += `Energy: ${lastBoxing.energy}/10 | Cardio: ${lastBoxing.cardio}/10 | Focus: ${lastBoxing.focus || '-'}/10 | Intensity: ${lastBoxing.intensity || '-'}/10\n`;
+      if (lastBoxing.notes) text += `Notes: "${lastBoxing.notes}"\n`;
+      text += '\n';
     }
 
     if (lastRunning) {
       text += `🏃 LAST RUNNING SESSION (${lastRunning.date})\n`;
-      text += `Dist: ${lastRunning.distance} | Time: ${lastRunning.time} | Pace: ${lastRunning.pace}\n`;
-      text += `Cardio/Legs feel: ${lastRunning.cardio}/10 ${lastRunning.legs}/10\n\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `Distance: ${lastRunning.distance || '-'} | Time: ${lastRunning.time || '-'} | Pace: ${lastRunning.pace || '-'}\n`;
+      text += `Cardio feel: ${lastRunning.cardio}/10 | Legs: ${lastRunning.legs}/10\n\n`;
     }
 
+    // ── SESSION HISTORY ───────────────────────────────────────────────────────────
     if (recentFull.length > 0) {
-      text += `📅 RECENT 10 SESSIONS\n`;
+      text += `📅 LAST ${recentFull.length} SESSIONS (newest first)\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       recentFull.forEach(log => {
-        text += `- ${log.date} [${log.type}] ${log.name || ''} | E:${log.energy} C:${log.cardio} I:${log.intensity || '-'} F:${log.focus || '-'} Dur:${log.duration || '-'}\n`;
+        const day = new Date(log.date).toLocaleDateString('en-US', { weekday: 'short' });
+        text += `${log.date} (${day}) [${log.type}]`;
+        if (log.name) text += ` "${log.name}"`;
+        text += ` | Dur: ${log.duration || '-'} | E:${log.energy} C:${log.cardio || '-'} I:${log.intensity || '-'} F:${log.focus || '-'} L:${log.legs || '-'}`;
+        if (log.skippedSteps > 0) text += ` | ⏭ skipped ${log.skippedSteps}`;
+        if (log.notes) text += ` | "${log.notes}"`;
+        text += '\n';
       });
       text += '\n';
     }
 
-    text += `\n---\nPlease analyze my training data and give me feedback on my progress, recovery, and what to focus on next.`;
+    // ── REQUEST ───────────────────────────────────────────────────────────────────
+    text += `═══════════════════════════════════════\n`;
+    text += `📋 WHAT I NEED FROM YOU\n`;
+    text += `═══════════════════════════════════════\n\n`;
+    text += `**1. TODAY'S WORKOUT** (${today} — ${todayDayName})\n`;
+    text += `Give me an appropriate workout for today considering my recent fatigue level, days since last session, and soreness. Include:\n`;
+    text += `- Warm-up (10–15 min with specific exercises)\n`;
+    text += `- Main block (rounds/sets/reps clearly stated, rest times clearly stated)\n`;
+    text += `- Cool-down & mobility\n`;
+    text += `- Total expected duration\n\n`;
+    text += `**2. NEXT WEEK SCHEDULE (Mon–Sun)**\n`;
+    text += `Build me a full week plan. For each day tell me:\n`;
+    text += `- Session type and name\n`;
+    text += `- Main focus/goal of the session\n`;
+    text += `- Approximate duration\n`;
+    text += `- Any specific exercises or drills I should do\n`;
+    text += `Respect my current level and don't overload me. Include at least 1 full rest day and 1 active recovery day.\n\n`;
+    text += `**3. TOP COACHING PRIORITIES**\n`;
+    text += `Based on my profile and data, what are the 2–3 things I should focus on most right now to improve fastest? Be specific — not generic advice.\n\n`;
+    text += `**4. RECOVERY / RED FLAGS**\n`;
+    text += `Do you see any warning signs in my data? Am I overtraining, under-recovering, or missing something important?\n\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `Note: Format the schedule clearly so I can copy it into my Boxing Planner app. Use simple structure:\n`;
+    text += `Monday: [Session Name] — [Duration] — [Focus]\nTuesday: REST / Active Recovery\netc.`;
 
-    // fallback copy logic
+    // ── COPY TO CLIPBOARD ─────────────────────────────────────────────────────────
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       });
     } else {
-      // Create a temporary textarea to copy
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -158,7 +257,6 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
-        console.error('Failed to copy', err);
         showAlert('Errore', 'Copy failed. Review console.');
       }
       document.body.removeChild(textArea);
@@ -185,9 +283,12 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
     <div className="page-container profile-view">
       <div className="profile-header">
         <h1 className="page-title">Athlete Profile</h1>
-        <button className="btn-secondary export-btn" onClick={handleExport}>
-          {copied ? <><Check size={18} /> Copied</> : <><Copy size={18} /> Export Coach</>}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          <button className="btn-secondary export-btn" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #b91c1c, #7c3aed)', color: 'white', border: 'none', fontWeight: 700 }}>
+            {copied ? <><Check size={18} /> Copied!</> : <>🤖 AI Coach Prompt</>}
+          </button>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Copy → paste into ChatGPT</span>
+        </div>
       </div>
 
       <div className="card profile-grid">
