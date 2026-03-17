@@ -147,10 +147,11 @@ input:focus, select:focus, textarea:focus {
 
 .main-content {
   flex: 1;
-  padding: 2rem;
-  padding-bottom: 6rem; /* Space for bottom nav on mobile */
+  padding: 1rem;
+  padding-bottom: 5rem; /* Space for bottom nav on mobile */
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
 }
 
 /* Responsive */

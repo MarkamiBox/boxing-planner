@@ -239,12 +239,12 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
   return (
     <div className="page-container schedule-view">
-      <div className="schedule-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="schedule-header">
         <h1 className="page-title">Schedule</h1>
         {currentWeekId && (
-          <div className="week-nav" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--surface-color)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>
+          <div className="week-nav">
             <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', minWidth: '85px', textAlign: 'center' }}>
+            <span className="week-range-text">
               {getWeekDateRange(currentWeekId)}
             </span>
             <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
