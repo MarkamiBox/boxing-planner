@@ -3,11 +3,12 @@ import { Copy, Save, Check, Download, Upload } from 'lucide-react';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 
-export function ProfileView({ profile, setProfile }) {
+export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, showConfirm }) {
   const [localProfile, setLocalProfile] = useState(profile);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef(null);
+  const logsInputRef = useRef(null);
   
   const { schedule, setSchedule } = useAppState();
 
@@ -38,6 +39,36 @@ export function ProfileView({ profile, setProfile }) {
     downloadAnchorNode.remove();
   };
 
+  const handleExportLogs = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "boxing_logs_" + new Date().toISOString().split('T')[0] + ".json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImportLogs = (e) => {
+    const fileReader = new FileReader();
+    if (e.target.files[0]) {
+      fileReader.readAsText(e.target.files[0], "UTF-8");
+      fileReader.onload = (event) => {
+        try {
+          const importedLogs = JSON.parse(event.target.result);
+          if (Array.isArray(importedLogs)) {
+            setLogs(importedLogs);
+            showAlert("Successo", "Log importati con successo!");
+          } else {
+            showAlert("Errore", "Struttura JSON non valida per i log.");
+          }
+        } catch (err) {
+          showAlert("Errore", "Errore nella lettura del JSON dei log.");
+        }
+      };
+    }
+  };
+
   const handleImportJSON = (e) => {
     const fileReader = new FileReader();
     if (e.target.files[0]) {
@@ -48,12 +79,12 @@ export function ProfileView({ profile, setProfile }) {
           // basic validation
           if (importedSchedule.monday && importedSchedule.sunday) {
             setSchedule(importedSchedule); // This sets the currentWeekId specifically due to useAppState abstraction
-            alert("Scheda importata con successo nella settimana corrente! Le tue settimane passate rimangono intatte nello storico, mentre le settimane future (ancora vuote) si baseranno su questa nuova scheda.");
+            showAlert("Successo", "Scheda importata con successo nella settimana corrente! Le tue settimane passate rimangono intatte nello storico, mentre le settimane future (ancora vuote) si baseranno su questa nuova scheda.");
           } else {
-            alert("Struttura JSON non valida per la scheda.");
+            showAlert("Errore", "Struttura JSON non valida per la scheda.");
           }
         } catch (err) {
-          alert("Errore nella lettura del JSON. Assicurati che sia valido.");
+          showAlert("Errore", "Errore nella lettura del JSON. Assicurati che sia valido.");
         }
       };
     }
@@ -66,9 +97,9 @@ export function ProfileView({ profile, setProfile }) {
     const lastRunning = logs.find(l => l.type === 'Running');
     
     let text = `🏋️ ATHLETE PROFILE 🥊\n`;
-    text += `Age: ${localProfile.age} | Weight: ${localProfile.weight}kg\n`;
+    text += `Age: ${localProfile.age} | Weight: ${localProfile.weight}kg | Height: ${localProfile.height || '-'}cm\n`;
     text += `Resting HR: ${localProfile.restingHR}bpm | Est. VO2max: ${localProfile.vo2max}\n`;
-    text += `Experience: ${localProfile.experience} | Style: ${localProfile.style} | Main: ${localProfile.primaryPunch}\n\n`;
+    text += `Experience: ${localProfile.experience} | Stance: ${localProfile.stance || 'Orthodox'} | Style: ${localProfile.style} | Main: ${localProfile.primaryPunch}\n\n`;
     
     text += `📊 TECHNICAL LEVELS (1-5)\n`;
     text += `Cardio: ${localProfile.levels.cardio} | Technique: ${localProfile.levels.technique} | Footwork: ${localProfile.levels.footwork}\n`;
@@ -114,7 +145,7 @@ export function ProfileView({ profile, setProfile }) {
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
         console.error('Failed to copy', err);
-        alert('Copy failed. Review console.');
+        showAlert('Errore', 'Copy failed. Review console.');
       }
       document.body.removeChild(textArea);
     }
@@ -157,6 +188,10 @@ export function ProfileView({ profile, setProfile }) {
           <input type="number" value={localProfile.weight} onChange={e => handleChange('weight', e.target.value)} />
         </div>
         <div className="form-group">
+          <label>Height (cm)</label>
+          <input type="number" value={localProfile.height || ''} onChange={e => handleChange('height', e.target.value)} />
+        </div>
+        <div className="form-group">
           <label>Resting HR (bpm)</label>
           <input type="number" value={localProfile.restingHR} onChange={e => handleChange('restingHR', e.target.value)} />
         </div>
@@ -174,6 +209,14 @@ export function ProfileView({ profile, setProfile }) {
         <div className="form-group">
           <label>Combat Style</label>
           <input type="text" value={localProfile.style} onChange={e => handleChange('style', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Stance</label>
+          <select value={localProfile.stance || 'Orthodox'} onChange={e => handleChange('stance', e.target.value)}>
+             <option value="Orthodox">Orthodox</option>
+             <option value="Southpaw">Southpaw</option>
+             <option value="Switch">Switch</option>
+          </select>
         </div>
         <div className="form-group">
           <label>Primary Punch</label>
@@ -201,7 +244,7 @@ export function ProfileView({ profile, setProfile }) {
       <div className="card profile-grid" style={{ marginTop: '2rem' }}>
         <h3 className="section-title" style={{ gridColumn: '1 / -1' }}>Data Management</h3>
         <p style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          Import or Export your weekly schedule in JSON format to share it or move it across devices.
+          Import or Export your weekly schedule and workout logs in JSON format to share it or move it across devices.
         </p>
 
         <div style={{ display: 'flex', gap: '1rem', gridColumn: '1 / -1' }}>
@@ -218,6 +261,23 @@ export function ProfileView({ profile, setProfile }) {
             ref={fileInputRef} 
             style={{ display: 'none' }} 
             onChange={handleImportJSON} 
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={handleExportLogs}>
+            <Download size={18} /> Export Logs
+          </button>
+
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => logsInputRef.current.click()}>
+            <Upload size={18} /> Import Logs
+          </button>
+          <input 
+            type="file" 
+            accept=".json" 
+            ref={logsInputRef} 
+            style={{ display: 'none' }} 
+            onChange={handleImportLogs} 
           />
         </div>
       </div>

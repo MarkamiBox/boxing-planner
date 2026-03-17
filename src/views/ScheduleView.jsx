@@ -4,7 +4,7 @@ import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs }) {
+export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs, showAlert, showConfirm }) {
   const [activeDay, setActiveDay] = useState('monday');
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -81,10 +81,14 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         };
         setLogs(prev => [placeholderLog, ...prev]);
         
-        if (window.confirm("Allenamento completato! Vuoi inserire i dettagli (fiato, energia, note)?\n\nPremendo 'Annulla' verrà salvata comunque come sessione veloce.")) {
-          setActiveWorkout({ ...ex, logId });
-          setActiveTab('logger');
-        }
+        showConfirm(
+          "Allenamento completato!", 
+          "Vuoi inserire i dettagli (fiato, energia, note)?\n\nPremendo 'Annulla' verrà salvata comunque come sessione veloce.",
+          () => {
+            setActiveWorkout({ ...ex, logId });
+            setActiveTab('logger');
+          }
+        );
       } else {
         // Se togli la spunta, elimina il log associato
         setLogs(prev => prev.filter(l => l.originId !== sessionOriginId));
@@ -116,6 +120,31 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     const newSchedule = { ...schedule };
     newSchedule[day] = newSchedule[day].filter(e => e.id !== exerciseId);
     setSchedule(newSchedule);
+  };
+
+  const copyPreviousWeek = () => {
+    if (!weeks || !currentWeekId) return;
+    const { y, w } = parseWeek(currentWeekId);
+    let prevW = w - 1; let prevY = y;
+    if (prevW < 1) { prevW = 52; prevY--; }
+    const prevId = getWeekString(prevY, prevW);
+    
+    if (weeks[prevId]) {
+      showConfirm("Copia Settimana", "Vuoi sovrascrivere questa settimana copiando la precedente?", () => {
+         const cloned = JSON.parse(JSON.stringify(weeks[prevId]));
+         Object.keys(cloned).forEach(day => cloned[day].forEach(ex => { ex.done = false; ex.logId = null; }));
+         setSchedule(cloned);
+      });
+    } else {
+      showAlert("Attenzione", "Non ci sono dati nella settimana precedente da copiare.");
+    }
+  };
+
+  const clearWeek = () => {
+    showConfirm("Svuota Settimana", "Sei sicuro di voler svuotare questa settimana? Tutti gli allenamenti programmati verranno rimossi.", () => {
+       const empty = { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
+       setSchedule(empty);
+    });
   };
 
   const addExercise = (day) => {
@@ -239,17 +268,23 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
   return (
     <div className="page-container schedule-view">
-      <div className="schedule-header">
-        <h1 className="page-title">Schedule</h1>
-        {currentWeekId && (
-          <div className="week-nav">
-            <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
-            <span className="week-range-text">
-              {getWeekDateRange(currentWeekId)}
-            </span>
-            <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
-          </div>
-        )}
+      <div className="schedule-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <h1 className="page-title" style={{ margin: 0 }}>Schedule</h1>
+          {currentWeekId && (
+            <div className="week-nav">
+              <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
+              <span className="week-range-text">
+                {getWeekDateRange(currentWeekId)}
+              </span>
+              <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '4px' }}>
+          <button className="btn-text" style={{ fontSize: '0.85rem', padding: '0', color: 'var(--primary)', fontWeight: 600 }} onClick={copyPreviousWeek}>+ Copia Prev</button>
+          <button className="btn-text" style={{ fontSize: '0.85rem', padding: '0', color: 'var(--text-muted)' }} onClick={clearWeek}>Svuota Settimana</button>
+        </div>
       </div>
 
       <div className="days-selector">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle } from 'lucide-react';
+import { Save, CheckCircle, Trash2 } from 'lucide-react';
 import './logger.css';
 
 export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
@@ -7,9 +7,19 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
 
   const [date, setDate] = useState(getTodayDate());
   const [type, setType] = useState(activeWorkout ? activeWorkout.type : 'Boxing');
+  
+  const [timeOfDay, setTimeOfDay] = useState(() => {
+    const d = new Date();
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  });
+  const [durationStr, setDurationStr] = useState('');
+  
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);
   const [legs, setLegs] = useState(7);
+  const [intensity, setIntensity] = useState(7);
+  const [focus, setFocus] = useState(7);
+  
   const [notes, setNotes] = useState(activeWorkout ? `Completed Guided Workout: ${activeWorkout.name}` : '');
   
   // Running specific
@@ -34,6 +44,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
 
   const handleSave = (e) => {
     e.preventDefault();
+    if (savedMessage) return; // Prevent duplicate immediate submissions
     
     let specificData = {};
     if (type === 'Running') {
@@ -47,12 +58,18 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
     const newLog = {
       id: logIdToUse,
       date,
+      timeOfDay,
       type,
       name: activeWorkout ? activeWorkout.name : '',
+      duration: durationStr || (activeWorkout?.timerStats?.actualDuration ? Math.round(activeWorkout.timerStats.actualDuration / 60) + ' min' : ''),
       energy,
       cardio,
       legs,
+      intensity,
+      focus,
       notes,
+      skippedSteps: activeWorkout?.timerStats?.skippedSteps || 0,
+      plannedDuration: activeWorkout?.timerStats?.plannedDuration || 0,
       ...specificData
     };
 
@@ -101,6 +118,14 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
             <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
           </div>
           <div className="form-group">
+            <label>Time of Day</label>
+            <input type="time" value={timeOfDay} onChange={e => setTimeOfDay(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Duration (mins)</label>
+            <input type="text" placeholder="e.g. 60" value={durationStr} onChange={e => setDurationStr(e.target.value)} />
+          </div>
+          <div className="form-group">
             <label>Session Type</label>
             <select value={type} onChange={e => setType(e.target.value)}>
               <option value="Boxing">Boxing / Sparring</option>
@@ -115,6 +140,8 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
         {renderSlider("Energy Level", energy, setEnergy)}
         {renderSlider("Cardio / Breath", cardio, setCardio)}
         {renderSlider("Legs Freshness", legs, setLegs)}
+        {renderSlider("Workout Intensity", intensity, setIntensity)}
+        {renderSlider("Mental Focus", focus, setFocus)}
 
         {type === 'Running' && (
           <>
@@ -176,16 +203,30 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
           <p style={{ color: 'var(--text-muted)' }}>No sessions logged yet.</p>
         ) : (
           logs.slice(0, 3).map(log => (
-            <div key={log.id} className="mini-log-card">
+            <div key={log.id} className="mini-log-card" style={{ position: 'relative' }}>
+              <button 
+                className="btn-icon danger" 
+                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', padding: '4px' }}
+                onClick={() => setLogs(logs.filter(l => l.id !== log.id))}
+                title="Delete Log"
+              >
+                <Trash2 size={16} />
+              </button>
               <div className="log-header">
                 <strong>{log.type}</strong>
-                <span className="log-date">{log.date}</span>
+                <span className="log-date">{log.date} {log.timeOfDay}</span>
               </div>
               <div className="log-stats-row">
+                <span>Dur: {log.duration || '-'}</span>
                 <span>E:{log.energy}</span>
-                <span>C:{log.cardio}</span>
-                <span>L:{log.legs}</span>
+                <span>I:{log.intensity || '-'}</span>
+                <span>F:{log.focus || '-'}</span>
               </div>
+              {log.skippedSteps > 0 && (
+                 <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '4px' }}>
+                   Skipped {log.skippedSteps} guided steps
+                 </div>
+              )}
             </div>
           ))
         )}

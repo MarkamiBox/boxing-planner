@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { Trash2 } from 'lucide-react';
 import './stats.css';
 
-export function StatsView({ logs, setLogs }) {
+export function StatsView({ logs, setLogs, showAlert, showConfirm }) {
   // Compute session counts
   const typeCounts = logs.reduce((acc, log) => {
     acc[log.type] = (acc[log.type] || 0) + 1;
@@ -11,6 +11,17 @@ export function StatsView({ logs, setLogs }) {
   }, {});
 
   const totalSessions = logs.length;
+
+  const totalMinutes = logs.reduce((acc, log) => {
+     let mins = 0;
+     if (typeof log.duration === 'string') {
+        mins = parseInt(log.duration.replace(/[^0-9]/g, '')) || 0;
+     } else if (typeof log.duration === 'number') {
+        mins = log.duration;
+     }
+     return acc + mins;
+  }, 0);
+  const totalHours = (totalMinutes / 60).toFixed(1);
 
   const getWeekDateRange = (wId) => {
     if (!wId) return '';
@@ -34,12 +45,18 @@ export function StatsView({ logs, setLogs }) {
     energy: log.energy,
     cardio: log.cardio,
     legs: log.legs,
+    intensity: log.intensity || 0,
+    focus: log.focus || 0,
   }));
 
   const handleDeleteLog = (id) => {
-    if (confirm("Sei sicuro di voler eliminare questa sessione?")) {
-      setLogs(logs.filter(l => l.id !== id));
-    }
+    showConfirm(
+      "Elimina Sessione",
+      "Sei sicuro di voler eliminare questa sessione?",
+      () => {
+        setLogs(logs.filter(l => l.id !== id));
+      }
+    );
   };
 
   return (
@@ -50,6 +67,10 @@ export function StatsView({ logs, setLogs }) {
         <div className="stat-card">
           <div className="stat-value">{totalSessions}</div>
           <div className="stat-label">Total Sessions</div>
+        </div>
+        <div className="stat-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
+          <div className="stat-value">{totalHours}h</div>
+          <div className="stat-label">Total Time</div>
         </div>
         <div className="stat-card boxing">
           <div className="stat-value">{typeCounts['Boxing'] || 0}</div>
@@ -84,6 +105,30 @@ export function StatsView({ logs, setLogs }) {
                 <Line type="monotone" dataKey="energy" stroke="#f59e0b" strokeWidth={3} dot={{r: 4}} name="Energy" />
                 <Line type="monotone" dataKey="cardio" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} name="Cardio" />
                 <Line type="monotone" dataKey="legs" stroke="#ef4444" strokeWidth={3} dot={{r: 4}} name="Legs" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="chart-container card" style={{ marginTop: '1rem' }}>
+        <h3 className="section-title">Intensity & Focus</h3>
+        {chartData.filter(d => d.intensity > 0).length < 2 ? (
+          <div className="empty-state">Not enough data to show intensity trends.</div>
+        ) : (
+          <div className="chart-wrapper">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={12} />
+                <YAxis domain={[0, 10]} stroke="var(--text-muted)" fontSize={12} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+                  itemStyle={{ color: 'var(--text-main)' }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="intensity" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} name="Intensity" />
+                <Line type="monotone" dataKey="focus" stroke="#10b981" strokeWidth={3} dot={{r: 4}} name="Focus" />
               </LineChart>
             </ResponsiveContainer>
           </div>

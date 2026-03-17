@@ -58,14 +58,62 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
   // Guided Workout State
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
 
+  // Stats tracking
+  const statsTracker = useRef({ actualDuration: 0, skippedSteps: 0, lastActive: null });
+  const plannedDuration = useRef(0);
+
   // Derive mode dynamically
   const isGuided = activeWorkout && activeWorkout.steps && activeWorkout.steps.length > 0;
   const currentStep = isGuided ? activeWorkout.steps[currentStepIdx] : null;
 
+  // Restore state on mount
   useEffect(() => {
-    // If we receive a new activeWorkout, reset the sequence
-    if (isGuided && phase === 'stopped') {
-      setCurrentStepIdx(0);
+    try {
+      const savedState = window.localStorage.getItem('bxng_timer_state');
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        setPhase(parsed.phase);
+        setCurrentRound(parsed.currentRound);
+        setCurrentStepIdx(parsed.currentStepIdx || 0);
+        setTimeLeft(parsed.timeLeft);
+        if (parsed.expectedEndTime) {
+           if (!timerRef.current) timerRef.current = {};
+           timerRef.current.expectedEndTime = parsed.expectedEndTime;
+        }
+        if (parsed.statsTracker) statsTracker.current = parsed.statsTracker;
+        if (parsed.plannedDuration) plannedDuration.current = parsed.plannedDuration;
+        if (parsed.isRunning && parsed.expectedEndTime) {
+           setIsRunning(true);
+        }
+      }
+    } catch(e) {}
+  }, []);
+
+  // Save state continuously
+  useEffect(() => {
+    if (phase !== 'stopped' || isRunning || (isGuided && currentStepIdx > 0)) {
+      const stateToSave = {
+        phase, isRunning, currentRound, currentStepIdx, timeLeft,
+        expectedEndTime: timerRef.current?.expectedEndTime || null,
+        statsTracker: statsTracker.current,
+        plannedDuration: plannedDuration.current
+      };
+      window.localStorage.setItem('bxng_timer_state', JSON.stringify(stateToSave));
+    } else {
+      window.localStorage.removeItem('bxng_timer_state');
+    }
+  }, [phase, isRunning, currentRound, currentStepIdx, timeLeft]);
+
+  useEffect(() => {
+    // If we receive a new activeWorkout, reset the sequence and compute planned duration
+    if (isGuided && phase === 'stopped' && currentStepIdx === 0) {
+      plannedDuration.current = activeWorkout.steps.reduce((acc, step) => {
+        if (step.type === 'timer' || step.type === 'manual_timer') return acc + step.duration;
+        if (step.type === 'interval') return acc + ((step.work + step.rest) * step.rounds);
+        if (step.type === 'sets') return acc + (step.rest * step.sets);
+        return acc;
+      }, 0);
+      statsTracker.current = { actualDuration: 0, skippedSteps: 0, lastActive: null };
     }
   }, [activeWorkout]);
 
@@ -81,6 +129,13 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
 
       timerRef.current.interval = setInterval(() => {
         const now = Date.now();
+        
+        // Track precise actual duration elapsed
+        if (statsTracker.current.lastActive) {
+          statsTracker.current.actualDuration += (now - statsTracker.current.lastActive) / 1000;
+        }
+        statsTracker.current.lastActive = now;
+
         const absoluteTimeLeft = Math.ceil((timerRef.current.expectedEndTime - now) / 1000);
         
         if (absoluteTimeLeft <= 0) {
@@ -97,8 +152,9 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
         }
       }, 250); // Tick faster for precision
     } else {
+      statsTracker.current.lastActive = null;
       if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
-      if (timerRef.current) delete timerRef.current.expectedEndTime;
+      if (timerRef.current) delete timerRef.current.expectedEndTime; // Pause clears absolute time
     }
     
     // Clear beep flags on phase change
@@ -188,6 +244,18 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
       setPhase('stopped');
       setIsRunning(false);
       
+      // Complete stats
+      if (isGuided) {
+        setActiveWorkout({
+          ...activeWorkout,
+          timerStats: {
+            actualDuration: statsTracker.current.actualDuration,
+            plannedDuration: plannedDuration.current,
+            skippedSteps: statsTracker.current.skippedSteps
+          }
+        });
+      }
+
       // Auto-jump to logger
       setActiveTab('logger');
     } else {
@@ -274,11 +342,39 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
     setTimeLeft(0);
     setCurrentRound(1);
     setCurrentStepIdx(0); // Reset guided
-    if (isGuided) setActiveWorkout(null); // Cancel guided workout
+    if (isGuided) {
+      if (window.confirm("Se interrompi ora, vuoi loggare l'attività parziale o annullare?\nOK = Vai al Logger\nAnnulla = Torna allo Schedule senza salvare")) {
+        setActiveWorkout({
+          ...activeWorkout,
+          timerStats: {
+            actualDuration: statsTracker.current.actualDuration,
+            plannedDuration: plannedDuration.current,
+            skippedSteps: statsTracker.current.skippedSteps
+          }
+        });
+        setActiveTab('logger');
+      } else {
+        setActiveWorkout(null); // Cancel entirely
+      }
+    }
   };
 
   const skipStep = () => {
-    advanceGuidedStep();
+    statsTracker.current.skippedSteps += 1;
+    if (!isGuided) { // For manual mode, simulate skip completely
+      if (phase === 'work' && currentRound < totalRounds) {
+        setPhase('rest');
+        setTimeLeft(rest);
+      } else if (phase === 'rest' || (phase === 'prep')) {
+        setPhase('work');
+        setTimeLeft(work);
+        if (phase === 'rest') setCurrentRound(r => r + 1);
+      } else {
+        stopTimer();
+      }
+    } else {
+      advanceGuidedStep();
+    }
   };
 
   const getPhaseColor = () => {
@@ -384,11 +480,9 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
              <button className="timer-btn pause" onClick={pauseTimer}><Pause size={32} /></button>
           )}
           <button className="timer-btn stop" onClick={stopTimer}><Square size={32} /></button>
-          {isGuided && (
-            <button className="timer-btn skip" onClick={skipStep} style={{ backgroundColor: 'var(--surface-hover)', borderColor: 'var(--text-muted)' }}>
-              <SkipForward size={24} />
-            </button>
-          )}
+          <button className="timer-btn skip" onClick={skipStep} style={{ backgroundColor: 'var(--surface-hover)', borderColor: 'var(--text-muted)' }}>
+            <SkipForward size={24} />
+          </button>
         </div>
       )}
 

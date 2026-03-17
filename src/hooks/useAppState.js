@@ -5,6 +5,8 @@ const APP_VERSION = 'v5'; // Update Presets
 const initialProfile = {
   age: '16-20',
   weight: '70',
+  height: '175',
+  stance: 'Orthodox',
   restingHR: '67',
   vo2max: '42',
   experience: '1.5 years',
