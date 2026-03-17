@@ -134,7 +134,7 @@ export function StatsView({ logs, setLogs, showAlert, showConfirm }) {
       <h1 className="page-title">Statistics</h1>
 
       {/* KPI Row */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-value">{totalSessions}</div>
           <div className="stat-label">Sessions</div>
