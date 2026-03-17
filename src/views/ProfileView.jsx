@@ -251,7 +251,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, sho
         <h1 className="page-title">Athlete Profile</h1>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <button className="btn-secondary export-btn" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #b91c1c, #7c3aed)', color: 'white', border: 'none', fontWeight: 700 }}>
-            {copied ? <><Check size={18} /> Copied!</> : <>🤖 AI Coach Prompt</>}
+            {copied ? <><Check size={18} /> Copied!</> : <>Coach Export</>}
           </button>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Copy → paste into ChatGPT</span>
         </div>
