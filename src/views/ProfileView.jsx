@@ -304,6 +304,10 @@ export function ProfileView({ profile, setProfile, logs, setLogs }) {
           <label>Primary Punch</label>
           <input type="text" value={localProfile.primaryPunch} onChange={e => handleChange('primaryPunch', e.target.value)} />
         </div>
+        <div className="form-group">
+          <label>Prep Time Between Exercises (sec)</label>
+          <input type="number" value={localProfile.prepTime !== undefined ? localProfile.prepTime : 10} onChange={e => handleChange('prepTime', Number(e.target.value))} />
+        </div>
 
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Technical Levels (1-5)</h3>
 

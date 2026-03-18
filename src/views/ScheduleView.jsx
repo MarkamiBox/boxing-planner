@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
+import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId } from '../utils';
 import './schedule.css';
 
@@ -298,19 +299,13 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
         {(step.type === 'timer' || step.type === 'manual_timer') && (
            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Duration (s):
-               <input type="number" value={step.duration} onChange={e => updateStep(idx, 'duration', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
-             </label>
+             <TimeInput label="Duration" value={step.duration} onChange={val => updateStep(idx, 'duration', val)} style={{ flex: 1 }} />
            </div>
         )}
         {step.type === 'interval' && (
            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Work (s):
-               <input type="number" value={step.work} onChange={e => updateStep(idx, 'work', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
-             </label>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Rest (s):
-               <input type="number" value={step.rest} onChange={e => updateStep(idx, 'rest', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
-             </label>
+             <TimeInput label="Work" value={step.work} onChange={val => updateStep(idx, 'work', val)} style={{ flex: 1 }} />
+             <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
              <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Rnds:
                <input type="number" value={step.rounds} onChange={e => updateStep(idx, 'rounds', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
@@ -324,9 +319,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
              <label style={{ fontSize: '0.75rem', flex: 1.5, color: 'var(--text-muted)' }}>Reps:
                <input type="text" value={step.reps || ''} onChange={e => updateStep(idx, 'reps', e.target.value)} style={{ width: '100%', padding: '4px', marginTop: '2px' }} placeholder="e.g. 10 reps" />
              </label>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Rest (s):
-               <input type="number" value={step.rest} onChange={e => updateStep(idx, 'rest', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
-             </label>
+             <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
            </div>
         )}
 
@@ -516,7 +509,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                         className="btn-icon" 
                         style={{ backgroundColor: 'var(--primary)', color: 'white', borderColor: 'var(--primary)' }}
                         onClick={() => {
-                          setActiveWorkout(ex);
+                          setActiveWorkout({ ...ex, sourceDay: activeDay });
                           setActiveTab('timer');
                         }}
                       >

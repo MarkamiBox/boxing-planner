@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import './logger.css';
 
-export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
+export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
   const [date, setDate] = useState(getTodayDate());
@@ -98,6 +98,19 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout }) {
       setLogs(logs.map(l => l.id === logIdToUse ? newLog : l));
     } else {
       setLogs([newLog, ...logs]);
+    }
+
+    // Auto-complete the schedule if it originated from one
+    if (activeWorkout && activeWorkout.sourceDay && activeWorkout.id && schedule && setSchedule) {
+      const daySchedule = schedule[activeWorkout.sourceDay];
+      if (daySchedule) {
+         const newSchedule = { ...schedule };
+         const exIdx = newSchedule[activeWorkout.sourceDay].findIndex(e => e.id === activeWorkout.id);
+         if (exIdx > -1) {
+            newSchedule[activeWorkout.sourceDay][exIdx].done = true;
+            setSchedule(newSchedule);
+         }
+      }
     }
 
     if (activeWorkout && setActiveWorkout) setActiveWorkout(null);

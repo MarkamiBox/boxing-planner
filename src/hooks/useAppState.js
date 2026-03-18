@@ -13,6 +13,7 @@ const initialProfile = {
   experience: '1.5 years',
   style: 'out-boxer counter-puncher',
   primaryPunch: 'jab',
+  prepTime: 10,
   levels: { cardio: 3, technique: 3, footwork: 3, defense: 3, jab: 4, reading: 3 }
 };
 
@@ -191,7 +192,7 @@ export function useAppState() {
 }
 
 // Same useLocalStorage functions below normally...
-function useLocalStorage(key, initialValue) {
+export function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
