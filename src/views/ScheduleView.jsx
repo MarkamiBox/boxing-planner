@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
-import { getTodayDayName } from '../utils';
+import { getTodayDayName, getWeekId } from '../utils';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -9,6 +9,7 @@ const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sat
 export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs }) {
   const { showAlert, showConfirm, showChoice } = useDialog();
   const todayDay = getTodayDayName();
+  const isCurrentWeek = currentWeekId === getWeekId();
   const [activeDay, setActiveDay] = useState(todayDay);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -378,7 +379,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
           return (
             <button
               key={day}
-              className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
+              className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay && isCurrentWeek ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
               onClick={() => setActiveDay(day)}
             >
               {day.substring(0, 3).toUpperCase()}
