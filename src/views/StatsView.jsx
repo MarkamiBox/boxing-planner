@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts';
 import { Trash2, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { getWeekId } from '../utils';
+import { useDialog } from '../components/DialogContext';
 import './stats.css';
-
-function getWeekId(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
-}
 
 function parseMins(log) {
   if (!log.duration) return 0;
@@ -20,7 +13,8 @@ function parseMins(log) {
 
 const TYPE_COLORS = { Boxing: '#ef4444', Running: '#3b82f6', Strength: '#f59e0b', Recovery: '#10b981' };
 
-export function StatsView({ logs, setLogs, showAlert, showConfirm }) {
+export function StatsView({ logs, setLogs }) {
+  const { showAlert, showConfirm } = useDialog();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAllHistory, setShowAllHistory] = useState(false);
 

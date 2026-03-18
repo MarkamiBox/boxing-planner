@@ -78,9 +78,60 @@
   border-color: var(--primary);
 }
 
+.day-btn.today:not(.active) {
+  border-color: #f59e0b;
+  color: #fcd34d;
+  box-shadow: 0 0 0 1px #f59e0b33;
+}
+
 .day-btn.day-complete:not(.active) {
   border-color: #10b981;
   color: #10b981;
+}
+
+/* Step editor cards */
+.step-edit-card {
+  background: var(--bg-color);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.step-edit-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.step-edit-label {
+  font-size: 0.75rem;
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.step-edit-label input {
+  width: 100%;
+  padding: 4px;
+  margin-top: 2px;
+}
+
+.step-edit-name {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 6px;
+  font-size: 0.85rem;
+}
+
+.step-edit-instruction {
+  width: 100%;
+  padding: 6px;
+  font-size: 0.85rem;
+}
+
+.steps-builder {
+  display: flex;
+  flex-direction: column;
 }
 
 .list-header {
@@ -140,6 +191,119 @@
   gap: 0.5rem;
   font-weight: 600;
 }
+
+.btn-icon.import-json-btn:hover {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* ── JSON Import Modal ─────────────────────────────── */
+.json-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.json-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+  animation: slideUp 0.15s ease-out;
+}
+
+.json-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.json-modal-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.json-modal-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.json-schema-example {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.72rem;
+  color: #a5f3fc;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+  white-space: pre;
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+  user-select: all;
+}
+
+.json-modal-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+  background: var(--bg-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+}
+
+.json-modal-textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
+}
+
+.json-modal-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ef4444;
+  font-size: 0.82rem;
+  margin-bottom: 0.75rem;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.json-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.json-modal-actions .btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* ─────────────────────────────────────────────────── */
 
 .empty-state {
   text-align: center;

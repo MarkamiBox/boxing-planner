@@ -2,8 +2,10 @@ import React, { useState, useRef } from 'react';
 import { Copy, Save, Check, Download, Upload } from 'lucide-react';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
+import { useDialog } from '../components/DialogContext';
 
-export function ProfileView({ profile, setProfile, logs, setLogs, showAlert, showConfirm }) {
+export function ProfileView({ profile, setProfile, logs, setLogs }) {
+  const { showAlert, showConfirm } = useDialog();
   const [localProfile, setLocalProfile] = useState(profile);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getWeekId } from '../utils';
 
 const APP_VERSION = 'v5'; // Update Presets
 
@@ -132,14 +133,7 @@ const initialSchedule = {
 };
 
 
-export function getWeekId(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
-}
+// getWeekId is now imported from '../utils'
 
 export function useAppState() {
   const [appVersion, setAppVersion] = useLocalStorage('bxng_app_version', '');
@@ -168,12 +162,12 @@ export function useAppState() {
        setCurrentWeekId(todayWeekId);
     }
 
-    if (appVersion !== 'v4') {
-      // Force rewrite to ensure new schema
+    if (appVersion !== APP_VERSION) {
+      // Force rewrite only when the app version truly changes
       setWeeks({ [todayWeekId]: initialSchedule });
       setCurrentWeekId(todayWeekId);
       resetTimerPresets();
-      setAppVersion('v4');
+      setAppVersion(APP_VERSION);
     }
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, resetTimerPresets, setAppVersion]);
 

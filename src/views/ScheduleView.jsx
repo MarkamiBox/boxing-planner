@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
-import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle } from 'lucide-react';
+import { useDialog } from '../components/DialogContext';
+import { getTodayDayName } from '../utils';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs, showAlert, showConfirm }) {
-  const [activeDay, setActiveDay] = useState('monday');
+export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs }) {
+  const { showAlert, showConfirm, showChoice } = useDialog();
+  const todayDay = getTodayDayName();
+  const [activeDay, setActiveDay] = useState(todayDay);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', steps: [] });
+
+  // JSON Import state
+  const [jsonImport, setJsonImport] = useState({ open: false, text: '', error: '' });
+
+  // Swipe gesture tracking
+  const swipeStartX = useRef(null);
 
   const parseWeek = (wId) => {
     if(!wId) return { y: new Date().getFullYear(), w: 1 };
@@ -82,13 +92,36 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         };
         setLogs(prev => [placeholderLog, ...prev]);
         
-        showConfirm(
-          "Allenamento completato!", 
-          "Vuoi inserire i dettagli (fiato, energia, note)?\n\nPremendo 'Annulla' verrà salvata comunque come sessione veloce.",
-          () => {
-            setActiveWorkout({ ...ex, logId });
-            setActiveTab('logger');
-          }
+        showChoice(
+          '🥊 Allenamento completato!',
+          'Cosa vuoi fare con questa sessione?',
+          [
+            {
+              label: '📋 Inserisci Dettagli',
+              className: 'btn-primary',
+              onClick: () => {
+                setActiveWorkout({ ...ex, logId });
+                setActiveTab('logger');
+              }
+            },
+            {
+              label: '⚡ Sessione Veloce',
+              className: 'btn-secondary',
+              onClick: () => { /* log already saved as placeholder — nothing to do */ }
+            },
+            {
+              label: '✕ Annulla',
+              className: 'btn-secondary',
+              onClick: () => {
+                // Remove the placeholder log and untick the checkbox
+                setLogs(prev => prev.filter(l => l.id !== logId));
+                const undoSchedule = { ...schedule };
+                const undoEx = undoSchedule[day].find(e => e.id === exerciseId);
+                if (undoEx) undoEx.done = false;
+                setSchedule(undoSchedule);
+              }
+            }
+          ]
         );
       } else {
         // Se togli la spunta, elimina il log associato
@@ -157,6 +190,61 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     setSchedule(newSchedule);
     startEdit({ id: newId, type: 'Boxing', name: 'New Exercise', notes: '', steps: [] });
   };
+
+  // ── JSON Import ──────────────────────────────────────────────────────────────
+  const openJsonImport = () => setJsonImport({ open: true, text: '', error: '' });
+  const closeJsonImport = () => setJsonImport({ open: false, text: '', error: '' });
+
+  const importExercisesFromJSON = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonImport.text);
+    } catch {
+      setJsonImport(s => ({ ...s, error: 'JSON non valido. Controlla la sintassi.' }));
+      return;
+    }
+
+    // Accept both a single object or an array
+    const exercises = Array.isArray(parsed) ? parsed : [parsed];
+
+    // Light validation: must have at least a name field
+    const invalid = exercises.find(e => typeof e !== 'object' || !e.name);
+    if (invalid) {
+      setJsonImport(s => ({ ...s, error: 'Ogni esercizio deve avere almeno un campo "name".' }));
+      return;
+    }
+
+    // Normalise: assign new ids, reset done flag
+    const now = Date.now();
+    const normalised = exercises.map((e, i) => ({
+      type: 'Boxing',
+      notes: '',
+      steps: [],
+      ...e,
+      id: (now + i).toString(),
+      done: false,
+    }));
+
+    const newSchedule = { ...schedule };
+    newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
+    setSchedule(newSchedule);
+    closeJsonImport();
+    showAlert('Import OK', `${normalised.length} esercizio/i aggiunto/i a ${activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}.`);
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ── Swipe to change day ───────────────────────────────────────────────────────
+  const handleTouchStart = (e) => { swipeStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (swipeStartX.current === null) return;
+    const diff = swipeStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) < 50) return; // ignore tiny swipes
+    const idx = daysOfWeek.indexOf(activeDay);
+    if (diff > 0 && idx < daysOfWeek.length - 1) setActiveDay(daysOfWeek[idx + 1]);
+    if (diff < 0 && idx > 0) setActiveDay(daysOfWeek[idx - 1]);
+    swipeStartX.current = null;
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // --- Step Builder Core ---
   const addStep = () => {
@@ -290,7 +378,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
           return (
             <button
               key={day}
-              className={`day-btn ${activeDay === day ? 'active' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
+              className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
               onClick={() => setActiveDay(day)}
             >
               {day.substring(0, 3).toUpperCase()}
@@ -304,12 +392,20 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         })}
       </div>
 
-      <div className="exercises-list">
+      <div className="exercises-list"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="list-header">
           <h2>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}'s Session</h2>
-          <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
-            <Plus size={20} />
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-icon import-json-btn" title="Import exercises from JSON" onClick={openJsonImport}>
+              <FileCode2 size={18} />
+            </button>
+            <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
+              <Plus size={20} />
+            </button>
+          </div>
         </div>
 
         {activeExercises.length === 0 ? (
@@ -467,6 +563,68 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
           ))
         )}
       </div>
+
+      {/* ── JSON Import Modal ─────────────────────────────────────── */}
+      {jsonImport.open && (
+        <div className="json-modal-overlay" onClick={closeJsonImport}>
+          <div className="json-modal" onClick={e => e.stopPropagation()}>
+            <div className="json-modal-header">
+              <h3><FileCode2 size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                Import JSON → <span style={{ color: 'var(--primary)' }}>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}</span>
+              </h3>
+              <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={closeJsonImport}><X size={18} /></button>
+            </div>
+
+            <p className="json-modal-hint">
+              Incolla un array di esercizi (o un singolo oggetto). Campi supportati:
+            </p>
+
+            <pre className="json-schema-example">{`[
+  {
+    "name": "Shadow Tecnico",
+    "type": "Boxing",
+    "notes": "4 round",
+    "steps": [
+      {
+        "type": "interval",
+        "name": "Shadow Rounds",
+        "work": 180, "rest": 60, "rounds": 4,
+        "instruction": "R1: jab. R2: combo."
+      }
+    ]
+  }
+]`}</pre>
+
+            <textarea
+              className="json-modal-textarea"
+              placeholder='[ { "name": "...", "type": "Boxing", "steps": [] } ]'
+              value={jsonImport.text}
+              onChange={e => setJsonImport(s => ({ ...s, text: e.target.value, error: '' }))}
+              spellCheck={false}
+              autoFocus
+            />
+
+            {jsonImport.error && (
+              <div className="json-modal-error">
+                <AlertCircle size={14} />{jsonImport.error}
+              </div>
+            )}
+
+            <div className="json-modal-actions">
+              <button className="btn-secondary" onClick={closeJsonImport}><X size={16} /> Annulla</button>
+              <button
+                className="btn-primary"
+                onClick={importExercisesFromJSON}
+                disabled={!jsonImport.text.trim()}
+              >
+                <FileCode2 size={16} /> Importa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────── */}
+
     </div>
   );
 }

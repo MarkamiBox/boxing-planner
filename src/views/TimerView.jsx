@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Square, Volume2, VolumeX, CheckCircle, SkipForward, X } from 'lucide-react';
+import { useDialog } from '../components/DialogContext';
 import './timer.css';
 
 const playBeep = (type = 'short') => {
@@ -41,6 +42,7 @@ const formatTime = (seconds) => {
 };
 
 export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout, setActiveTab }) {
+  const { showConfirm } = useDialog();
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Manual Timer State 
@@ -343,19 +345,20 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
     setCurrentRound(1);
     setCurrentStepIdx(0); // Reset guided
     if (isGuided) {
-      if (window.confirm("Se interrompi ora, vuoi loggare l'attività parziale o annullare?\nOK = Vai al Logger\nAnnulla = Torna allo Schedule senza salvare")) {
-        setActiveWorkout({
-          ...activeWorkout,
-          timerStats: {
-            actualDuration: statsTracker.current.actualDuration,
-            plannedDuration: plannedDuration.current,
-            skippedSteps: statsTracker.current.skippedSteps
-          }
-        });
-        setActiveTab('logger');
-      } else {
-        setActiveWorkout(null); // Cancel entirely
-      }
+      const partialStats = {
+        ...activeWorkout,
+        timerStats: {
+          actualDuration: statsTracker.current.actualDuration,
+          plannedDuration: plannedDuration.current,
+          skippedSteps: statsTracker.current.skippedSteps
+        }
+      };
+      showConfirm(
+        'Interrompi Workout',
+        `Vuoi loggare l'attività parziale o annullare?`,
+        () => { setActiveWorkout(partialStats); setActiveTab('logger'); },
+        () => { setActiveWorkout(null); }
+      );
     }
   };
 
