@@ -300,6 +300,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         {(step.type === 'timer' || step.type === 'manual_timer') && (
            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
              <TimeInput label="Duration" value={step.duration} onChange={val => updateStep(idx, 'duration', val)} style={{ flex: 1 }} />
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>
+               Prep (s):
+               <input type="number" min="0" placeholder="default" value={step.prepTime !== undefined ? step.prepTime : ''} onChange={e => updateStep(idx, 'prepTime', e.target.value === '' ? undefined : Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
+             </label>
            </div>
         )}
         {step.type === 'interval' && (
@@ -308,6 +312,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
              <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
              <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Rnds:
                <input type="number" value={step.rounds} onChange={e => updateStep(idx, 'rounds', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
+             </label>
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>
+               Prep (s):
+               <input type="number" min="0" placeholder="default" value={step.prepTime !== undefined ? step.prepTime : ''} onChange={e => updateStep(idx, 'prepTime', e.target.value === '' ? undefined : Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
            </div>
         )}

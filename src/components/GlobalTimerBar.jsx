@@ -1,7 +1,6 @@
 import React from 'react';
-import { Play, Pause, Square, ExternalLink } from 'lucide-react';
+import { Play, Pause, Square } from 'lucide-react';
 import { useTimer } from './TimerContext';
-import { pipRenderer } from '../utils/pipTimer';
 import { formatTime } from '../utils';
 
 export function GlobalTimerBar({ activeTab, setActiveTab }) {
@@ -28,10 +27,6 @@ export function GlobalTimerBar({ activeTab, setActiveTab }) {
   if (phase === 'stopped' && isGuided && currentStep && currentStep.type === 'text') return null;
 
   const bg = getPhaseColor();
-
-  const handlePiP = async () => {
-    await pipRenderer.requestPiP();
-  };
 
   return (
     <div style={{
@@ -68,9 +63,6 @@ export function GlobalTimerBar({ activeTab, setActiveTab }) {
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); handlePiP(); }} style={{ padding: '6px', color: 'var(--text-muted)' }} title="Picture-in-Picture">
-          <ExternalLink size={20} />
-        </button>
         {!isRunning ? (
           <button className="btn-icon" onClick={(e) => { e.stopPropagation(); startTimer(); }} style={{ padding: '6px', backgroundColor: 'var(--primary)', color: 'white', border: 'none' }}>
             <Play size={20} fill="white" />
