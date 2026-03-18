@@ -96,7 +96,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
       {/* Controls */}
       {(!isGuided || (currentStep && currentStep.type !== 'text' && currentStep.type !== 'sets') || (currentStep && currentStep.type === 'sets' && isRunning)) && (
         <div className="timer-controls">
-          <button className="timer-btn skip" onClick={previousStep} style={{ backgroundColor: 'var(--surface-hover)', borderColor: 'var(--text-muted)', visibility: isGuided && currentStepIdx > 0 ? 'visible' : 'hidden' }}>
+          <button className="timer-btn skip" onClick={previousStep} style={{ backgroundColor: 'var(--surface-hover)', borderColor: 'var(--text-muted)', visibility: (isGuided && currentStepIdx > 0) || (!isGuided && phase !== 'stopped') ? 'visible' : 'hidden' }}>
             <SkipBack size={24} />
           </button>
 

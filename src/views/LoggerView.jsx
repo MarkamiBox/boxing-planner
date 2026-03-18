@@ -72,8 +72,12 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
 
     const logIdToUse = (activeWorkout && activeWorkout.logId) ? activeWorkout.logId : Date.now().toString();
 
+    // Preserve originId from the existing log if updating (so unticking still removes it)
+    const existingLog = (activeWorkout?.logId) ? logs.find(l => l.id === logIdToUse) : null;
+
     const newLog = {
       id: logIdToUse,
+      ...(existingLog?.originId ? { originId: existingLog.originId } : {}),
       date,
       timeOfDay,
       type,

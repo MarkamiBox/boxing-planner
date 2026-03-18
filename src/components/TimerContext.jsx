@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { pipRenderer } from '../utils/pipTimer';
-import { formatTime } from '../utils';
 import { useDialog } from './DialogContext';
 
 const TimerContext = createContext(null);
@@ -243,10 +241,11 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       prepareGuidedStep(nextStep);
       
       if (nextStep.type !== 'manual_timer' && nextStep.type !== 'sets' && nextStep.type !== 'text') {
+        const stepPrep = getStepPrepTime(nextStep);
         setTimeout(() => {
           setPhase('prep');
-          setTimeLeft(globalPrepTime > 0 ? globalPrepTime : 0);
-          if (globalPrepTime === 0 && nextStep.type === 'timer') {
+          setTimeLeft(stepPrep > 0 ? stepPrep : 0);
+          if (stepPrep === 0 && nextStep.type === 'timer') {
              setPhase('work');
              setTimeLeft(nextStep.duration);
           }
@@ -256,7 +255,10 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     }
   };
 
-  const getStepPrepTime = () => globalPrepTime;
+  const getStepPrepTime = (step) => {
+    if (step && step.prepTime !== undefined) return step.prepTime;
+    return globalPrepTime;
+  };
 
   const prepareGuidedStep = (step) => {
     setPhase('stopped');
@@ -267,7 +269,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     if (step.type === 'timer' || step.type === 'manual_timer') {
       setTimeLeft(step.duration);
     } else if (step.type === 'interval') {
-      setTimeLeft(getStepPrepTime());
+      setTimeLeft(getStepPrepTime(step));
     } else if (step.type === 'sets') {
       setTimeLeft(0);
     }
@@ -277,12 +279,13 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     if (isGuided && currentStep) {
       if (currentStep.type !== 'sets') {
         if (phase === 'stopped') {
+           const stepPrep = getStepPrepTime(currentStep);
            setPhase('prep');
-           setTimeLeft(getStepPrepTime());
+           setTimeLeft(stepPrep);
            setIsRunning(true);
            playBeep('short', !soundEnabled);
            // if no prep time, jump straight in
-           if (getStepPrepTime() === 0 && currentStep.type === 'timer') {
+           if (stepPrep === 0 && currentStep.type === 'timer') {
              setPhase('work');
              setTimeLeft(currentStep.duration);
            }
@@ -293,8 +296,9 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       }
     } else {
       if (phase === 'stopped') {
+        const manualPrep = globalPrepTime > 0 ? globalPrepTime : 10;
         setPhase('prep');
-        setTimeLeft(getStepPrepTime() > 0 ? getStepPrepTime() : 10);
+        setTimeLeft(manualPrep);
         setCurrentRound(1);
       }
       setIsRunning(true);
@@ -356,7 +360,27 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   };
 
   const previousStep = () => {
-    if (!isGuided || currentStepIdx === 0) return;
+    if (!isGuided) {
+      // Manual timer: go back one phase
+      if (phase === 'rest') {
+        setPhase('work');
+        setTimeLeft(work);
+        delete timerRef.current.expectedEndTime;
+      } else if (phase === 'work' && currentRound > 1) {
+        setPhase('rest');
+        setTimeLeft(rest);
+        setCurrentRound(r => r - 1);
+        delete timerRef.current.expectedEndTime;
+      } else if (phase === 'work' || phase === 'prep') {
+        setPhase('stopped');
+        setIsRunning(false);
+        setTimeLeft(0);
+        setCurrentRound(1);
+        delete timerRef.current.expectedEndTime;
+      }
+      return;
+    }
+    if (currentStepIdx === 0) return;
     statsTracker.current.skippedSteps = Math.max(0, statsTracker.current.skippedSteps - 1);
     const prevStep = activeWorkout.steps[currentStepIdx - 1];
     setCurrentStepIdx(prev => prev - 1);
@@ -377,21 +401,6 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     if (phase === 'rest') return 'REST';
     return '';
   };
-
-  // Sync to PiP renderer
-  useEffect(() => {
-    const dsc = isGuided ? (currentStep ? currentStep.name : '') : 'Manual Boxe Timer';
-    pipRenderer.updateState(getPhaseLabel(), timeLeft, dsc, isRunning, getPhaseColor());
-  }, [phase, timeLeft, isRunning, isGuided, currentStepIdx, activeWorkout]);
-
-  // Hook up Media Session callbacks
-  useEffect(() => {
-    pipRenderer.setCallbacks(
-      () => { if (isRunning) pauseTimer(); else startTimer(); },
-      () => { skipStep(); },
-      () => { previousStep(); }
-    );
-  }, [isRunning, phase, currentStepIdx]);
 
   return (
     <TimerContext.Provider value={{
