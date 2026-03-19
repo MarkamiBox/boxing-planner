@@ -147,6 +147,19 @@ export function useAppState() {
   const [logs, setLogs] = useLocalStorage('bxng_logs', []);
   const [activeWorkout, setActiveWorkout] = useState(null);
 
+  // Coach system state
+  const [goals, setGoals] = useLocalStorage('bxng_goals', []);
+  const [coachConversations, setCoachConversations] = useLocalStorage('bxng_coach_conversations', []);
+  const [coachMemory, setCoachMemory] = useLocalStorage('bxng_coach_memory', {
+    preferences: [], patterns: [], decisions: [], progress_notes: []
+  });
+  const [coachSettings, setCoachSettings] = useLocalStorage('bxng_coach_settings', {
+    apiKey: '', model: 'claude-sonnet-4-20250514'
+  });
+
+  // Pending coach context (set after logging a session, consumed by CoachView)
+  const [pendingCoachContext, setPendingCoachContext] = useState(null);
+
   useEffect(() => {
     const todayWeekId = getWeekId();
     
@@ -187,7 +200,12 @@ export function useAppState() {
     schedule, setSchedule,
     timerPresets, setTimerPresets,
     logs, setLogs,
-    activeWorkout, setActiveWorkout
+    activeWorkout, setActiveWorkout,
+    goals, setGoals,
+    coachConversations, setCoachConversations,
+    coachMemory, setCoachMemory,
+    coachSettings, setCoachSettings,
+    pendingCoachContext, setPendingCoachContext
   };
 }
 

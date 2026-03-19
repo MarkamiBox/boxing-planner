@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award } from 'lucide-react';
+import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain } from 'lucide-react';
 import './logger.css';
 
-export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule }) {
+export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
   const [date, setDate] = useState(getTodayDate());
@@ -47,6 +47,8 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [editingLogId, setEditingLogId] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
+  const [showCoachBridge, setShowCoachBridge] = useState(false);
+  const [lastSavedLog, setLastSavedLog] = useState(null);
 
   // Sync if activeWorkout changes
   useEffect(() => {
@@ -119,7 +121,14 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
 
     if (activeWorkout && setActiveWorkout) setActiveWorkout(null);
     setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 3000);
+    setTimeout(() => {
+      setSavedMessage(false);
+      // Show coach bridge prompt after save animation
+      if (setActiveTab && setPendingCoachContext && energy > 0) {
+        setShowCoachBridge(true);
+        setLastSavedLog(newLog);
+      }
+    }, 1500);
     setNotes('');
     setDurationStr('');
   };
@@ -375,6 +384,46 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
           ))
         )}
       </div>
+
+      {/* Coach Bridge */}
+      {showCoachBridge && (
+        <div style={{
+          position: 'fixed', bottom: '5rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, var(--surface), #1a1a2e)',
+          border: '1px solid var(--primary)', borderRadius: '1rem',
+          padding: '1rem 1.25rem', maxWidth: '90vw', width: '360px',
+          boxShadow: '0 8px 24px rgba(185, 28, 28, 0.3)', zIndex: 100,
+          animation: 'slideUp 0.3s ease-out'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+              <Brain size={18} style={{ color: 'var(--primary)' }} /> Sessione salvata!
+            </span>
+            <button className="btn-icon" style={{ padding: '2px' }} onClick={() => setShowCoachBridge(false)}>
+              <X size={16} />
+            </button>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Vuoi dire al coach come è andata?
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-primary" style={{ flex: 1, padding: '0.5rem' }}
+              onClick={() => {
+                setPendingCoachContext(lastSavedLog);
+                setActiveTab('coach');
+                setShowCoachBridge(false);
+              }}
+            >
+              <Brain size={16} /> Parla con il Coach
+            </button>
+            <button className="btn-secondary" style={{ padding: '0.5rem 0.75rem' }}
+              onClick={() => setShowCoachBridge(false)}
+            >
+              Chiudi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

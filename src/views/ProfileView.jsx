@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Copy, Save, Check, Download, Upload } from 'lucide-react';
+import { Copy, Save, Check, Download, Upload, Plus, Trash2, Target, CheckCircle } from 'lucide-react';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
 
-export function ProfileView({ profile, setProfile, logs, setLogs }) {
+export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals }) {
   const { showAlert, showConfirm } = useDialog();
   const [localProfile, setLocalProfile] = useState(profile);
   const [saved, setSaved] = useState(false);
@@ -325,6 +325,94 @@ export function ProfileView({ profile, setProfile, logs, setLogs }) {
             {saved ? 'Saved!' : 'Save Profile Changes'}
           </button>
         </div>
+      </div>
+
+      {/* Goals Section */}
+      <div className="card" style={{ marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 className="section-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Target size={18} /> Goals
+          </h3>
+          <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+            onClick={() => setGoals([...goals, { id: Date.now().toString(), text: '', type: 'short', targetDate: '', status: 'active', createdAt: new Date().toISOString() }])}
+          >
+            <Plus size={14} /> Add Goal
+          </button>
+        </div>
+
+        {goals.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No goals set yet. Add your first training goal!</p>
+        ) : (
+          <>
+            {/* Short-term goals */}
+            {goals.filter(g => g.type === 'short').length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Short-term</h4>
+                {goals.filter(g => g.type === 'short').map(goal => (
+                  <div key={goal.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem', background: 'var(--bg-color)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', opacity: goal.status === 'completed' ? 0.5 : 1 }}>
+                    <button style={{ padding: '2px', color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
+                      onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
+                    >
+                      <CheckCircle size={18} />
+                    </button>
+                    <input type="text" value={goal.text} placeholder="e.g. Run 5km under 25min"
+                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.9rem', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
+                    />
+                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.8rem' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
+                    />
+                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.8rem' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
+                    >
+                      <option value="short">Short</option>
+                      <option value="long">Long</option>
+                    </select>
+                    <button className="btn-icon danger" style={{ padding: '4px' }}
+                      onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Long-term goals */}
+            {goals.filter(g => g.type === 'long').length > 0 && (
+              <div>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Long-term</h4>
+                {goals.filter(g => g.type === 'long').map(goal => (
+                  <div key={goal.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem', background: 'var(--bg-color)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', opacity: goal.status === 'completed' ? 0.5 : 1 }}>
+                    <button style={{ padding: '2px', color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
+                      onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
+                    >
+                      <CheckCircle size={18} />
+                    </button>
+                    <input type="text" value={goal.text} placeholder="e.g. First competitive fight"
+                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.9rem', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
+                    />
+                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.8rem' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
+                    />
+                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.8rem' }}
+                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
+                    >
+                      <option value="short">Short</option>
+                      <option value="long">Long</option>
+                    </select>
+                    <button className="btn-icon danger" style={{ padding: '4px' }}
+                      onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="card profile-grid" style={{ marginTop: '2rem' }}>

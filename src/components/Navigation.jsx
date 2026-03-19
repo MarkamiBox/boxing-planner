@@ -1,10 +1,11 @@
 import React from 'react';
-import { Calendar, TimerReset, PlusCircle, Activity, User } from 'lucide-react';
+import { Calendar, TimerReset, PlusCircle, Activity, User, Brain } from 'lucide-react';
 
 export const tabs = [
   { id: 'schedule', label: 'Schedule', icon: Calendar },
   { id: 'timer', label: 'Timer', icon: TimerReset },
-  { id: 'logger', label: 'Log Session', icon: PlusCircle },
+  { id: 'logger', label: 'Log', icon: PlusCircle },
+  { id: 'coach', label: 'Coach', icon: Brain },
   { id: 'stats', label: 'Stats', icon: Activity },
   { id: 'profile', label: 'Profile', icon: User },
 ];
@@ -23,7 +24,7 @@ export function Navigation({ activeTab, setActiveTab }) {
               className={`nav-btn ${isActive ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <Icon size={24} />
+              <Icon size={20} />
               <span>{tab.label}</span>
             </button>
           );
