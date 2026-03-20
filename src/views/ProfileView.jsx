@@ -346,33 +346,40 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           <>
             {/* Short-term goals */}
             {goals.filter(g => g.type === 'short').length > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Short-term</h4>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Short-term</h4>
                 {goals.filter(g => g.type === 'short').map(goal => (
-                  <div key={goal.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem', background: 'var(--bg-color)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', opacity: goal.status === 'completed' ? 0.5 : 1 }}>
-                    <button style={{ padding: '2px', color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
-                      onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
-                    >
-                      <CheckCircle size={18} />
-                    </button>
-                    <input type="text" value={goal.text} placeholder="e.g. Run 5km under 25min"
-                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
-                    />
-                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
-                    />
-                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.85rem' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
-                    >
-                      <option value="short">Short</option>
-                      <option value="long">Long</option>
-                    </select>
-                    <button className="btn-icon danger" style={{ padding: '4px' }}
-                      onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div key={goal.id} className="goal-item" style={{ opacity: goal.status === 'completed' ? 0.6 : 1 }}>
+                    <div className="goal-row-main">
+                      <button className="goal-checkbox" style={{ color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
+                        onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
+                      >
+                        <CheckCircle size={20} />
+                      </button>
+                      <input type="text" value={goal.text} placeholder="e.g. Run 5km under 25min"
+                        className="goal-input-text"
+                        style={{ textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                        onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
+                      />
+                    </div>
+                    <div className="goal-row-meta">
+                      <div className="goal-controls">
+                        <input type="date" value={goal.targetDate || ''} className="goal-input-date"
+                          onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
+                        />
+                        <select value={goal.type} className="goal-select-type"
+                          onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
+                        >
+                          <option value="short">Short</option>
+                          <option value="long">Long</option>
+                        </select>
+                      </div>
+                      <button className="btn-icon danger" style={{ padding: '6px' }}
+                        onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -381,36 +388,44 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
             {/* Long-term goals */}
             {goals.filter(g => g.type === 'long').length > 0 && (
               <div>
-                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Long-term</h4>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Long-term</h4>
                 {goals.filter(g => g.type === 'long').map(goal => (
-                  <div key={goal.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem', background: 'var(--bg-color)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', opacity: goal.status === 'completed' ? 0.5 : 1 }}>
-                    <button style={{ padding: '2px', color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
-                      onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
-                    >
-                      <CheckCircle size={18} />
-                    </button>
-                    <input type="text" value={goal.text} placeholder="e.g. First competitive fight"
-                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
-                    />
-                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
-                    />
-                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.85rem' }}
-                      onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
-                    >
-                      <option value="short">Short</option>
-                      <option value="long">Long</option>
-                    </select>
-                    <button className="btn-icon danger" style={{ padding: '4px' }}
-                      onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div key={goal.id} className="goal-item" style={{ opacity: goal.status === 'completed' ? 0.6 : 1 }}>
+                    <div className="goal-row-main">
+                      <button className="goal-checkbox" style={{ color: goal.status === 'completed' ? '#10b981' : 'var(--text-muted)' }}
+                        onClick={() => setGoals(goals.map(g => g.id === goal.id ? { ...g, status: g.status === 'completed' ? 'active' : 'completed' } : g))}
+                      >
+                        <CheckCircle size={20} />
+                      </button>
+                      <input type="text" value={goal.text} placeholder="e.g. First competitive fight"
+                        className="goal-input-text"
+                        style={{ textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                        onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
+                      />
+                    </div>
+                    <div className="goal-row-meta">
+                      <div className="goal-controls">
+                        <input type="date" value={goal.targetDate || ''} className="goal-input-date"
+                          onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
+                        />
+                        <select value={goal.type} className="goal-select-type"
+                          onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
+                        >
+                          <option value="short">Short</option>
+                          <option value="long">Long</option>
+                        </select>
+                      </div>
+                      <button className="btn-icon danger" style={{ padding: '6px' }}
+                        onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+
           </>
         )}
       </div>

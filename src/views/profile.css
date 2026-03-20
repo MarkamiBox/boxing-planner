@@ -84,3 +84,100 @@
   background: var(--primary);
   cursor: pointer;
 }
+
+/* Goals Styles */
+.goal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-color);
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-color);
+  margin-bottom: 0.75rem;
+  transition: opacity 0.2s;
+}
+
+.goal-row-main {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.goal-checkbox {
+  flex-shrink: 0;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.goal-input-text {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  color: var(--text-main);
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+
+.goal-input-text:focus {
+  outline: none;
+  border-bottom: 1px solid var(--primary);
+}
+
+.goal-row-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 2rem; /* Align with text under checkbox */
+}
+
+.goal-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.goal-input-date {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  width: 130px;
+}
+
+.goal-select-type {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  width: 80px;
+}
+
+@media (min-width: 650px) {
+  .goal-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .goal-row-main {
+    flex: 1;
+  }
+
+  .goal-row-meta {
+    padding-left: 0;
+    justify-content: flex-end;
+  }
+}
+
