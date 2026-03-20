@@ -15,7 +15,8 @@ export function executeToolCall(toolName, toolInput, appState) {
 
   switch (toolName) {
     case 'modify_exercise': {
-      const { day, exerciseId, fields } = toolInput;
+      const { exerciseId, fields } = toolInput;
+      const day = toolInput.day?.toLowerCase();
       const dayExercises = schedule[day];
       if (!dayExercises) return { success: false, message: `Day "${day}" not found in schedule.` };
 
@@ -41,7 +42,8 @@ export function executeToolCall(toolName, toolInput, appState) {
     }
 
     case 'add_exercise': {
-      const { day, exercise } = toolInput;
+      const { exercise } = toolInput;
+      const day = toolInput.day?.toLowerCase();
       const newSchedule = { ...schedule };
       const newId = Date.now().toString();
 
@@ -67,7 +69,8 @@ export function executeToolCall(toolName, toolInput, appState) {
     }
 
     case 'remove_exercise': {
-      const { day, exerciseId } = toolInput;
+      const { exerciseId } = toolInput;
+      const day = toolInput.day?.toLowerCase();
       const dayExercises = schedule[day];
       if (!dayExercises) return { success: false, message: `Day "${day}" not found.` };
 
@@ -82,7 +85,8 @@ export function executeToolCall(toolName, toolInput, appState) {
     }
 
     case 'replace_exercise': {
-      const { day, exerciseId, newExercise } = toolInput;
+      const { exerciseId, newExercise } = toolInput;
+      const day = toolInput.day?.toLowerCase();
       const dayExercises = schedule[day];
       if (!dayExercises) return { success: false, message: `Day "${day}" not found.` };
 
@@ -109,7 +113,9 @@ export function executeToolCall(toolName, toolInput, appState) {
     }
 
     case 'reschedule_exercise': {
-      const { fromDay, exerciseId, toDay } = toolInput;
+      const { exerciseId } = toolInput;
+      const fromDay = toolInput.fromDay?.toLowerCase();
+      const toDay = toolInput.toDay?.toLowerCase();
       const fromExercises = schedule[fromDay];
       if (!fromExercises) return { success: false, message: `Day "${fromDay}" not found.` };
 

@@ -356,13 +356,13 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                       <CheckCircle size={18} />
                     </button>
                     <input type="text" value={goal.text} placeholder="e.g. Run 5km under 25min"
-                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.9rem', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', background: 'var(--surface)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
                     />
-                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.8rem' }}
+                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
                     />
-                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.8rem' }}
+                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.85rem' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
                     >
                       <option value="short">Short</option>
@@ -390,13 +390,13 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                       <CheckCircle size={18} />
                     </button>
                     <input type="text" value={goal.text} placeholder="e.g. First competitive fight"
-                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.9rem', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', background: 'var(--surface)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
                     />
-                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.8rem' }}
+                    <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetDate: e.target.value } : g))}
                     />
-                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.8rem' }}
+                    <select value={goal.type} style={{ width: '90px', padding: '0.4rem', fontSize: '0.85rem' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, type: e.target.value } : g))}
                     >
                       <option value="short">Short</option>

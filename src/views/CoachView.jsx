@@ -8,6 +8,26 @@ import './coach.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const result = [];
+  lines.forEach((line, lineIdx) => {
+    if (lineIdx > 0) result.push('\n');
+    const regex = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+    let lastIdx = 0;
+    let match;
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > lastIdx) result.push(line.slice(lastIdx, match.index));
+      if (match[1] !== undefined) result.push(<strong key={`b-${lineIdx}-${match.index}`}>{match[1]}</strong>);
+      else result.push(<em key={`i-${lineIdx}-${match.index}`}>{match[2]}</em>);
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < line.length) result.push(line.slice(lastIdx));
+  });
+  return result;
+}
+
 export function CoachView({
   profile, setProfile,
   schedule, setSchedule,
@@ -205,10 +225,23 @@ export function CoachView({
       const toolMessages = [];
       const newHighlights = new Set();
 
+      // Snapshot before executing any tools (for rollback)
+      const snapshot = { schedule, goals, coachMemory };
+
+      // Mutable refs so sequential tool calls see updated state
+      let currentSchedule = schedule;
+      let currentGoals = goals;
+      let currentMemory = coachMemory;
+
       for (const toolUse of result.toolUses) {
         const appState = {
-          schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId,
-          profile, setProfile, goals, setGoals, coachMemory, setCoachMemory
+          schedule: currentSchedule,
+          setSchedule: (s) => { currentSchedule = s; setSchedule(s); },
+          goals: currentGoals,
+          setGoals: (g) => { currentGoals = g; setGoals(g); },
+          coachMemory: currentMemory,
+          setCoachMemory: (m) => { currentMemory = m; setCoachMemory(m); },
+          weeks, setWeeks, currentWeekId, setCurrentWeekId, profile, setProfile
         };
 
         const toolResult = executeToolCall(toolUse.name, toolUse.input, appState);
@@ -243,7 +276,8 @@ export function CoachView({
         toolCalls: result.toolUses.map((tu, i) => ({
           ...tu,
           result: toolMessages[i]?.result
-        }))
+        })),
+        snapshot
       };
 
       const updatedMsgs = [...conversationMessages, assistantMsg];
@@ -273,11 +307,15 @@ export function CoachView({
 
       // Handle recursive tool calls (in case follow-up also uses tools)
       if (followUp.toolUses && followUp.toolUses.length > 0) {
-        // For simplicity, handle one level of recursion
         for (const toolUse of followUp.toolUses) {
           const appState = {
-            schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId,
-            profile, setProfile, goals, setGoals, coachMemory, setCoachMemory
+            schedule: currentSchedule,
+            setSchedule: (s) => { currentSchedule = s; setSchedule(s); },
+            goals: currentGoals,
+            setGoals: (g) => { currentGoals = g; setGoals(g); },
+            coachMemory: currentMemory,
+            setCoachMemory: (m) => { currentMemory = m; setCoachMemory(m); },
+            weeks, setWeeks, currentWeekId, setCurrentWeekId, profile, setProfile
           };
           executeToolCall(toolUse.name, toolUse.input, appState);
         }
@@ -345,7 +383,7 @@ export function CoachView({
             <select
               value={activeConvId || ''}
               onChange={e => { setActiveConvId(e.target.value); setStreamingText(''); setError(''); }}
-              style={{ maxWidth: '150px', padding: '0.25rem', fontSize: '0.8rem' }}
+              style={{ maxWidth: '150px', minWidth: '100px', padding: '0.25rem', fontSize: '0.8rem' }}
             >
               {coachConversations.map(c => (
                 <option key={c.id} value={c.id}>{c.title}</option>
@@ -436,8 +474,29 @@ export function CoachView({
                     )}
                   </React.Fragment>
                 ))}
+                {/* Undo button for messages with tool calls */}
+                {msg.toolCalls?.length > 0 && msg.snapshot && !msg.undone && (
+                  <button
+                    style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '2px 8px', background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    onClick={() => {
+                      setSchedule(msg.snapshot.schedule);
+                      setGoals(msg.snapshot.goals);
+                      setCoachMemory(msg.snapshot.coachMemory);
+                      setCoachConversations(prev => prev.map(c =>
+                        c.id === activeConvId
+                          ? { ...c, messages: c.messages.map((m, i) => i === idx ? { ...m, undone: true } : m) }
+                          : c
+                      ));
+                    }}
+                  >
+                    ↩ Undo
+                  </button>
+                )}
+                {msg.undone && (
+                  <span style={{ alignSelf: 'flex-start', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>↩ Reverted</span>
+                )}
                 {/* Message text */}
-                {msg.content && <div className="coach-msg assistant">{msg.content}</div>}
+                {msg.content && <div className="coach-msg assistant">{renderMarkdown(msg.content)}</div>}
               </React.Fragment>
             );
           }
@@ -446,7 +505,7 @@ export function CoachView({
 
         {/* Streaming text */}
         {streamingText && (
-          <div className="coach-msg assistant">{streamingText}</div>
+          <div className="coach-msg assistant">{renderMarkdown(streamingText)}</div>
         )}
 
         {/* Loading indicator */}

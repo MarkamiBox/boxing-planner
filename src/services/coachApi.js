@@ -21,7 +21,7 @@ export const coachTools = [
     input_schema: {
       type: 'object',
       properties: {
-        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: 'Day of the week' },
+        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day of the week in lowercase (e.g. 'monday', 'tuesday')" },
         exerciseId: { type: 'string', description: 'ID of the exercise to modify' },
         fields: {
           type: 'object',
@@ -61,7 +61,7 @@ export const coachTools = [
     input_schema: {
       type: 'object',
       properties: {
-        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] },
+        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day of the week in lowercase (e.g. 'monday', 'tuesday')" },
         exercise: {
           type: 'object',
           description: 'The exercise object to add',
@@ -100,7 +100,7 @@ export const coachTools = [
     input_schema: {
       type: 'object',
       properties: {
-        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] },
+        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day of the week in lowercase (e.g. 'monday', 'tuesday')" },
         exerciseId: { type: 'string', description: 'ID of the exercise to remove' }
       },
       required: ['day', 'exerciseId']
@@ -112,7 +112,7 @@ export const coachTools = [
     input_schema: {
       type: 'object',
       properties: {
-        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] },
+        day: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day of the week in lowercase (e.g. 'monday', 'tuesday')" },
         exerciseId: { type: 'string', description: 'ID of the exercise to replace' },
         newExercise: {
           type: 'object',
@@ -134,9 +134,9 @@ export const coachTools = [
     input_schema: {
       type: 'object',
       properties: {
-        fromDay: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] },
+        fromDay: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day in lowercase (e.g. 'monday')" },
         exerciseId: { type: 'string' },
-        toDay: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] }
+        toDay: { type: 'string', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], description: "Day in lowercase (e.g. 'monday')" }
       },
       required: ['fromDay', 'exerciseId', 'toDay']
     }
@@ -305,7 +305,7 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
   const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const todayDayNum = new Date().getDay(); // 0=Sun, 4=Thu, 5=Fri, 6=Sat
 
-  const recentLogs = (logs || []).filter(l => l.energy > 0).slice(0, 12);
+  const recentLogs = (logs || []).filter(l => l.energy > 0).slice(0, 5);
 
   const avg = (arr, key) => arr.length > 0 ? (arr.reduce((a, l) => a + (l[key] || 0), 0) / arr.length).toFixed(1) : '-';
   const avgEnergy = avg(recentLogs, 'energy');
@@ -327,14 +327,7 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
     const exList = exercises.map(ex => {
       let desc = `    [${ex.done ? 'DONE' : 'TODO'}] (id:${ex.id}) ${ex.type} — "${ex.name}"`;
       if (ex.notes) desc += ` | Notes: ${ex.notes}`;
-      if (ex.steps && ex.steps.length > 0) {
-        desc += `\n      Steps: ${ex.steps.map(s => {
-          if (s.type === 'timer' || s.type === 'manual_timer') return `${s.name} (${s.type}, ${s.duration}s)`;
-          if (s.type === 'interval') return `${s.name} (interval, ${s.rounds}x ${s.work}s work/${s.rest}s rest)`;
-          if (s.type === 'sets') return `${s.name} (sets, ${s.sets}x ${s.reps}, rest ${s.rest}s)`;
-          return `${s.name} (text)`;
-        }).join(' → ')}`;
-      }
+      if (ex.steps?.length > 0) desc += ` | ${ex.steps.length} steps`;
       return desc;
     }).join('\n');
     return `  ${day}:\n${exList}`;
@@ -392,8 +385,8 @@ CURRENT WEEK: ${currentWeekId}
 ═══ ATHLETE PROFILE ═══
 Age: ${profile.age} | Weight: ${lastWeight ? lastWeight + 'kg' : profile.weight + 'kg'} | Height: ${profile.height}cm
 Stance: ${profile.stance} | Experience: ${profile.experience}
-Style: ${profile.style} | Primary punch: ${profile.primaryPunch}
-Resting HR: ${profile.restingHR}bpm | VO2max: ${profile.vo2max}
+Style: ${profile.style}${profile.primaryPunch ? ` | Primary punch: ${profile.primaryPunch}` : ''}
+Resting HR: ${profile.restingHR}bpm${profile.vo2max ? ` | VO2max: ${profile.vo2max}` : ''}
 
 Technical Levels (1-5):
   Cardio: ${profile.levels.cardio} | Technique: ${profile.levels.technique} | Footwork: ${profile.levels.footwork}

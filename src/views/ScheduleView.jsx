@@ -3,19 +3,21 @@ import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, Chev
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId } from '../utils';
+import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs }) {
-  const { showAlert, showConfirm, showChoice } = useDialog();
+  const { showAlert, showConfirm } = useDialog();
   const todayDay = getTodayDayName();
   const isCurrentWeek = currentWeekId === getWeekId();
   const [activeDay, setActiveDay] = useState(todayDay);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
-  
+  const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
+
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', steps: [] });
 
   // JSON Import state
@@ -93,38 +95,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
           notes: 'Sessione veloce dallo Schedule'
         };
         setLogs(prev => [placeholderLog, ...prev]);
-        
-        showChoice(
-          '🥊 Allenamento completato!',
-          'Cosa vuoi fare con questa sessione?',
-          [
-            {
-              label: '📋 Inserisci Dettagli',
-              className: 'btn-primary',
-              onClick: () => {
-                setActiveWorkout({ ...ex, logId });
-                setActiveTab('logger');
-              }
-            },
-            {
-              label: '⚡ Sessione Veloce',
-              className: 'btn-secondary',
-              onClick: () => { /* log already saved as placeholder — nothing to do */ }
-            },
-            {
-              label: '✕ Annulla',
-              className: 'btn-secondary',
-              onClick: () => {
-                // Remove the placeholder log and untick the checkbox
-                setLogs(prev => prev.filter(l => l.id !== logId));
-                const undoSchedule = { ...schedule };
-                const undoEx = undoSchedule[day].find(e => e.id === exerciseId);
-                if (undoEx) undoEx.done = false;
-                setSchedule(undoSchedule);
-              }
-            }
-          ]
-        );
+        setQuickLogTarget({ exercise: ex, logId, day });
       } else {
         // Se togli la spunta, elimina il log associato
         setLogs(prev => prev.filter(l => l.originId !== sessionOriginId));
@@ -627,6 +598,27 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       )}
       {/* ─────────────────────────────────────────────────────────── */}
 
+      {/* Quick Log Bottom Sheet */}
+      {quickLogTarget && (
+        <QuickLogSheet
+          exercise={quickLogTarget.exercise}
+          onSave={(logData) => {
+            setLogs(prev => prev.map(l =>
+              l.id === quickLogTarget.logId ? { ...l, ...logData } : l
+            ));
+            setQuickLogTarget(null);
+          }}
+          onSkip={() => setQuickLogTarget(null)}
+          onCancel={() => {
+            setLogs(prev => prev.filter(l => l.id !== quickLogTarget.logId));
+            const undoSchedule = { ...schedule };
+            const undoEx = undoSchedule[quickLogTarget.day]?.find(e => e.id === quickLogTarget.exercise.id);
+            if (undoEx) undoEx.done = false;
+            setSchedule(undoSchedule);
+            setQuickLogTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }
