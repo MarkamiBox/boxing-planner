@@ -492,9 +492,7 @@ export function CoachView({
                     ↩ Undo
                   </button>
                 )}
-                {msg.undone && (
-                  <span style={{ alignSelf: 'flex-start', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>↩ Reverted</span>
-                )}
+
                 {/* Message text */}
                 {msg.content && <div className="coach-msg assistant">{renderMarkdown(msg.content)}</div>}
               </React.Fragment>

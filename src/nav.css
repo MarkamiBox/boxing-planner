@@ -1,4 +1,24 @@
 /* Navigation Styles */
+.mobile-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  z-index: 50;
+}
+
+@media (min-width: 768px) {
+  .mobile-topbar {
+    display: none;
+  }
+}
+
 .mobile-nav {
   position: fixed;
   bottom: 0;

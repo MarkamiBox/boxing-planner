@@ -252,7 +252,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       <div className="profile-header">
         <h1 className="page-title">Athlete Profile</h1>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-          <button className="btn-secondary export-btn" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #b91c1c, #7c3aed)', color: 'white', border: 'none', fontWeight: 700 }}>
+          <button className="btn-secondary export-btn" onClick={handleExport}>
             {copied ? <><Check size={18} /> Copied!</> : <>Coach Export</>}
           </button>
         </div>
@@ -356,7 +356,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                       <CheckCircle size={18} />
                     </button>
                     <input type="text" value={goal.text} placeholder="e.g. Run 5km under 25min"
-                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', background: 'var(--surface)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
                     />
                     <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}
@@ -390,7 +390,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                       <CheckCircle size={18} />
                     </button>
                     <input type="text" value={goal.text} placeholder="e.g. First competitive fight"
-                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', background: 'var(--surface)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
+                      style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '1rem', color: 'var(--text-main)', textDecoration: goal.status === 'completed' ? 'line-through' : 'none' }}
                       onChange={e => setGoals(goals.map(g => g.id === goal.id ? { ...g, text: e.target.value } : g))}
                     />
                     <input type="date" value={goal.targetDate || ''} style={{ width: '140px', padding: '0.4rem', fontSize: '0.85rem' }}

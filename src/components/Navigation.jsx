@@ -13,6 +13,11 @@ export const tabs = [
 export function Navigation({ activeTab, setActiveTab }) {
   return (
     <>
+      {/* Mobile Top Bar */}
+      <div className="mobile-topbar">
+        <img src="/logo.svg" alt="Boxing Planner" style={{ width: '32px', height: '32px' }} />
+      </div>
+
       {/* Mobile Bottom Bar */}
       <nav className="mobile-nav">
         {tabs.map((tab) => {
@@ -34,7 +39,7 @@ export function Navigation({ activeTab, setActiveTab }) {
       {/* Desktop Sidebar */}
       <aside className="desktop-sidebar">
         <div className="sidebar-header">
-          <h2 className="logo">BXNG<span className="dot">.</span></h2>
+          <img src="/logo.svg" alt="Boxing Planner" style={{ width: '52px', height: '52px' }} />
         </div>
         <div className="sidebar-menu">
           {tabs.map((tab) => {
