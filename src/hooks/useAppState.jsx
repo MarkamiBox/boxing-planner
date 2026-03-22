@@ -5,17 +5,17 @@ import { getWeekId } from '../utils';
 const APP_VERSION = 'v5'; // Update Presets
 
 const initialProfile = {
-  age: '16-20',
-  weight: '70',
-  height: '175',
+  age: '20-25',
+  weight: '75',
+  height: '180',
   stance: 'Orthodox',
-  restingHR: '67',
-  vo2max: '42',
-  experience: '1.5 years',
-  style: 'out-boxer counter-puncher',
+  restingHR: '65',
+  vo2max: '40',
+  experience: '6 months',
+  style: 'all-around',
   primaryPunch: 'jab',
   prepTime: 10,
-  levels: { cardio: 3, technique: 3, footwork: 3, defense: 3, jab: 4, reading: 3 }
+  levels: { cardio: 2, technique: 2, footwork: 2, defense: 2, jab: 2, reading: 2 }
 };
 
 const initialTimerPresets = [
@@ -29,103 +29,51 @@ const initialTimerPresets = [
   { id: '8', name: 'Sacco Pesante (3m / 30s x 5)', work: 180, rest: 30, rounds: 5 }
 ];
 
-/* 
-Step Schema:
-type: 'timer' (continuous countdown) | 'interval' (rounds of work/rest) | 'sets' (reps + manual done -> auto rest countdown) | 'text' (manual instruction block) | 'manual_timer' (waits for play button)
-*/
 const initialSchedule = {
   monday: [
     { 
-      id: 'm1', type: 'Running', name: 'Full Roadwork (75 min)', done: false, notes: 'Esci 16:30',
+      id: 'm1', type: 'Running', name: 'Roadwork Parco (45 min)', done: false, notes: '17:00 - Corsa leggera',
       steps: [
-        { id: 's1', type: 'timer', duration: 1200, name: 'Jogging verso il lungomare', instruction: 'Ritmo 6-7 km/h - riscaldamento naturale' },
-        { id: 's2', type: 'interval', work: 30, rest: 90, rounds: 10, name: 'Sprint sul lungomare', instruction: '30s sprint massimale + 90s jogging 6 km/h' },
-        { id: 's3', type: 'timer', duration: 300, name: 'Corsa continua', instruction: '5 min coda sprint, 7-8 km/h' },
-        { id: 's4', type: 'timer', duration: 1200, name: 'Camminata di ritorno', instruction: 'Defaticamento naturale' },
-        { id: 's5', type: 'manual_timer', duration: 600, name: 'Stretching a casa', instruction: 'Ileopsoas (45s), Quadricipiti (45s), Adduttori (45s), Polpacci (45s x lato), Spalle (30s), Busto (30s).' }
+        { id: 's1', type: 'timer', duration: 600, name: 'Riscaldamento', instruction: 'Corsa molto lenta' },
+        { id: 's2', type: 'timer', duration: 1800, name: 'Corsa Continua', instruction: 'Ritmo costante, respira regolarmente' },
+        { id: 's3', type: 'manual_timer', duration: 300, name: 'Stretching Finale', instruction: 'Gambe e schiena' }
       ]
     }
   ],
   tuesday: [
     { 
-      id: 't1', type: 'Boxing', name: 'iGym: Circuito ai Sacchi', done: false, notes: 'Corso (15:15-16:15)',
-      steps: [{ id: 's1', type: 'text', name: 'Corso iGym', instruction: 'Segui il corso in palestra.' }]
-    },
-    { 
-      id: 't2', type: 'Strength', name: 'Forza Esplosiva Casa', done: false, notes: '60 min (16:30-17:30)',
-      steps: [
-        { id: 's1', type: 'sets', sets: 3, reps: '5 reps', rest: 120, name: 'Flessioni esplosive con clap', instruction: 'Scendi lento, spingi esplosivo staccando le mani.' },
-        { id: 's2', type: 'sets', sets: 3, reps: '5 reps', rest: 120, name: 'Squat jump manubri 4-6kg', instruction: 'Scendi a 90°, sali esplosivo.' },
-        { id: 's3', type: 'sets', sets: 3, reps: '8 reps', rest: 90, name: 'Military press manubri', instruction: 'Seduto, spingi sopra la testa.' },
-        { id: 's4', type: 'sets', sets: 3, reps: '8 reps', rest: 90, name: 'Rowing per braccio', instruction: 'Ginocchio sul banco, schiena piatta.' },
-        { id: 's5', type: 'sets', sets: 3, reps: '10 reps', rest: 60, name: 'Shadow lento con manubri 1kg', instruction: 'Solo jab/dir, focus rotazione.' },
-        { id: 's6', type: 'sets', sets: 3, reps: '30 sec', rest: 30, name: 'Plank', instruction: 'Tenuta isometrica.' },
-        { id: 's7', type: 'sets', sets: 3, reps: '20 reps', rest: 60, name: 'Russian twist', instruction: 'Rotazione completa con manubrio.' },
-        { id: 's8', type: 'manual_timer', duration: 600, name: 'Stretching', instruction: 'Stretching completo 10 min.' }
-      ]
+      id: 't1', type: 'Boxing', name: 'Palestra: Fondamentali', done: false, notes: 'Corso Tecnico (18:00)',
+      steps: [{ id: 's1', type: 'text', name: 'Allenamento di Classe', instruction: 'Segui le istruzioni del maestro.' }]
     }
   ],
   wednesday: [
-    { id: 'w1', type: 'Strength', name: 'Core Leggero', done: false, notes: 'Mattina (30 min) se hai tempo',
+    { id: 'w1', type: 'Recovery', name: 'Mobilità Casa', done: false, notes: '20 min',
       steps: [
-        { id: 's1', type: 'sets', sets: 3, reps: '30 sec', rest: 30, name: 'Plank' },
-        { id: 's2', type: 'sets', sets: 3, reps: '15 reps', rest: 45, name: 'Leg raise lento' },
-        { id: 's3', type: 'sets', sets: 3, reps: '20 reps', rest: 45, name: 'Crunch obliqui' },
-        { id: 's4', type: 'manual_timer', duration: 600, name: 'Stretching leggero', instruction: '10 min' }
-      ]
-    },
-    { id: 'w2', type: 'Running', name: 'Tapirulan', done: false, notes: '45 min (16:30 - 18:30)',
-      steps: [
-        { id: 's1', type: 'timer', duration: 300, name: 'Riscaldamento Tapirulan', instruction: '4 km/h' },
-        { id: 's2', type: 'timer', duration: 2100, name: 'Corsa sul Tapirulan', instruction: '5.5-6 km/h (fatica a parlare)' },
-        { id: 's3', type: 'timer', duration: 300, name: 'Defaticamento Tapirulan', instruction: '4 km/h' }
-      ]
-    },
-    { id: 'w3', type: 'Boxing', name: 'Shadow Tecnico', done: false, notes: '24 min',
-      steps: [
-        { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 4, name: 'Shadow Tecnico Rounds', instruction: 'R1: Solo jab. R2: Jab+Dir in/out. R3: Footwork puro. R4: Tutto insieme.' },
-        { id: 's2', type: 'manual_timer', duration: 600, name: 'Stretching', instruction: '10 min.' }
+        { id: 's1', type: 'manual_timer', duration: 1200, name: 'Routine Mobilità', instruction: 'Rotazioni articolari e stretching dinamico.' }
       ]
     }
   ],
   thursday: [
-    { id: 'th1', type: 'Recovery', name: 'Riscaldamento Corda', done: false, notes: '',
+    { id: 'th1', type: 'Boxing', name: 'Sacco & Shadow Palestra', done: false, notes: 'Focus: Jab e Distanza',
       steps: [
-        { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 3, name: 'Corda Rounds', instruction: 'R1: base. R2: 30s vel/30s norm. R3: sostenuto continuo.' }
-      ]
-    },
-    { id: 'th2', type: 'Boxing', name: 'Shadow Sessione Libera', done: false, notes: '',
-      steps: [
-        { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 4, name: 'Shadow Rounds', instruction: 'R1: jab laterale. R2: counter+head mov. R3: combo lente. R4: sparring leggero.' }
-      ]
-    },
-    { id: 'th3', type: 'Boxing', name: 'Sacco', done: false, notes: 'Oberdan (16:30-18:30)',
-      steps: [
-        { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 5, name: 'Sacco Rounds', instruction: 'R1: jab vel. R2: combo 2 colpi. R3: body shots. R4: potenza. R5: massimale libero.' }
-      ]
-    },
-    { id: 'th4', type: 'Strength', name: 'Core Finale', done: false, notes: '15 min + stretch',
-      steps: [
-        { id: 's1', type: 'sets', sets: 3, reps: '30 sec', rest: 30, name: 'Plank' },
-        { id: 's2', type: 'sets', sets: 3, reps: '20 reps', rest: 45, name: 'Russian twist' },
-        { id: 's3', type: 'sets', sets: 3, reps: '15 reps', rest: 45, name: 'Leg raise' },
-        { id: 's4', type: 'sets', sets: 3, reps: '20 reps', rest: 45, name: 'Crunch obliqui' },
-        { id: 's5', type: 'manual_timer', duration: 600, name: 'Stretching 10 min' }
+        { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 3, name: 'Shadow Boxing', instruction: 'Focus su footwork e jab.' },
+        { id: 's2', type: 'interval', work: 180, rest: 60, rounds: 4, name: 'Lavoro al Sacco', instruction: 'R1-2: Jab. R3-4: Combinazioni base.' }
       ]
     }
   ],
   friday: [
-    { id: 'f1', type: 'Recovery', name: 'Mobilità Leggera', done: false, notes: 'Mattina (20 min)',
+    { id: 'f1', type: 'Strength', name: 'Circuito Forza Casa', done: false, notes: 'Corpo libero',
       steps: [
-        { id: 's1', type: 'manual_timer', duration: 1200, name: 'Mobilità & Stretching Gambe', instruction: 'Rotazioni anche, caviglie, spalle. Per mantenere le gambe sciolte per sabato.' }
+        { id: 's1', type: 'sets', sets: 3, reps: '10', rest: 60, name: 'Pushups' },
+        { id: 's2', type: 'sets', sets: 3, reps: '15', rest: 60, name: 'Squats' },
+        { id: 's3', type: 'sets', sets: 3, reps: '30 sec', rest: 30, name: 'Plank' }
       ]
     }
   ],
   saturday: [
-    { id: 's1', type: 'Boxing', name: 'Palestra Completa iGym', done: false, notes: '5h+\nSpeedball, sacco, shadow, sparring',
+    { id: 's1', type: 'Boxing', name: 'Sessione Libera Palestra', done: false, notes: 'Ripasso tecnico e sacco',
       steps: [
-        { id: 's1', type: 'text', name: 'Workout in Palestra', instruction: 'Gestisci tempo e pause autonomamente in palestra.' },
-        { id: 's2', type: 'manual_timer', duration: 900, name: 'Stretching Finale', instruction: '15 min a fine allenamento.' }
+        { id: 's1', type: 'text', name: 'Workout Libero', instruction: 'Lavora sui tuoi punti deboli.' }
       ]
     }
   ],
@@ -133,11 +81,6 @@ const initialSchedule = {
     { id: 'su1', type: 'Recovery', name: 'Riposo Totale', done: false, notes: '', steps: [] }
   ]
 };
-
-
-// getWeekId is now imported from '../utils'
-
-// ─── IDB Context Provider ────────────────────────────────────────────────────────
 
 const AppStateStoreContext = createContext(null);
 
@@ -187,8 +130,6 @@ export function AppStateProvider({ children }) {
   );
 }
 
-// ─── IDB Sync Hook ────────────────────────────────────────────────────────────
-
 export function useIdbStorage(key, initialValue) {
   const ctx = useContext(AppStateStoreContext);
   if (!ctx) throw new Error("useIdbStorage must be used within AppStateProvider");
@@ -210,40 +151,33 @@ export function useIdbStorage(key, initialValue) {
   return [storedValue, setValue, resetValue];
 }
 
-// ─── App State Aggregation ────────────────────────────────────────────────────
-
 export function useAppState() {
   const [appVersion, setAppVersion] = useIdbStorage('bxng_app_version', '');
-  const [profile, setProfile, resetProfile] = useIdbStorage('bxng_profile', initialProfile);
-  
+  const [profile, setProfile] = useIdbStorage('bxng_profile', initialProfile);
   const [weeks, setWeeks] = useIdbStorage('bxng_weeks', null);
   const [currentWeekId, setCurrentWeekId] = useIdbStorage('bxng_current_week', null);
-  
   const [timerPresets, setTimerPresets, resetTimerPresets] = useIdbStorage('bxng_timer_presets', initialTimerPresets);
   const [logs, setLogs] = useIdbStorage('bxng_logs', []);
   const [activeWorkout, setActiveWorkout] = useState(null);
-
   const [goals, setGoals] = useIdbStorage('bxng_goals', []);
   const [coachConversations, setCoachConversations] = useIdbStorage('bxng_coach_conversations', []);
   const [coachMemory, setCoachMemory] = useIdbStorage('bxng_coach_memory', {
     preferences: [], patterns: [], decisions: [], progress_notes: []
   });
   const [coachSettings, setCoachSettings] = useIdbStorage('bxng_coach_settings', {
-    apiKey: '', model: 'claude-sonnet-4-20250514'
+    apiKey: '', model: 'claude-sonnet-4-20250514', anthropicKey: '', openrouterKey: '', googleKey: '', activeProvider: 'anthropic'
   });
-
+  const [pendingTools, setPendingTools] = useState(null);
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
 
   useEffect(() => {
     const todayWeekId = getWeekId();
-    
     if (!weeks) {
        setWeeks({ [todayWeekId]: initialSchedule });
        setCurrentWeekId(todayWeekId);
     } else if (!currentWeekId) {
        setCurrentWeekId(todayWeekId);
     }
-
     if (appVersion !== APP_VERSION) {
       setWeeks({ [todayWeekId]: initialSchedule });
       setCurrentWeekId(todayWeekId);
@@ -253,7 +187,6 @@ export function useAppState() {
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, resetTimerPresets, setAppVersion]);
 
   const schedule = weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;
-  
   const setSchedule = (newSchedule) => {
     if (!currentWeekId) return;
     setWeeks(prev => ({ ...(prev || {}), [currentWeekId]: newSchedule }));
@@ -271,6 +204,7 @@ export function useAppState() {
     coachConversations, setCoachConversations,
     coachMemory, setCoachMemory,
     coachSettings, setCoachSettings,
-    pendingCoachContext, setPendingCoachContext
+    pendingCoachContext, setPendingCoachContext,
+    pendingTools, setPendingTools
   };
 }

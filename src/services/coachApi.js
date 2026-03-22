@@ -9,6 +9,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 export function detectProvider(apiKey) {
   if (apiKey?.startsWith('sk-or-')) return 'openrouter';
+  if (apiKey?.startsWith('AIza')) return 'google';
   return 'anthropic';
 }
 
@@ -30,6 +31,7 @@ export const coachTools = [
             name: { type: 'string' },
             type: { type: 'string', enum: ['Boxing', 'Strength', 'Running', 'Recovery'] },
             notes: { type: 'string' },
+            plannedTime: { type: 'string', description: 'Starting time in HH:mm format, e.g. "17:30"' },
             steps: {
               type: 'array',
               items: {
@@ -70,6 +72,7 @@ export const coachTools = [
             name: { type: 'string' },
             type: { type: 'string', enum: ['Boxing', 'Strength', 'Running', 'Recovery'] },
             notes: { type: 'string' },
+            plannedTime: { type: 'string', description: 'Starting time in HH:mm format, e.g. "14:45"' },
             steps: {
               type: 'array',
               items: {
@@ -246,6 +249,16 @@ function convertToolsToOpenAI(anthropicTools) {
   }));
 }
 
+function convertToolsToGoogle(anthropicTools) {
+  return {
+    function_declarations: anthropicTools.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema
+    }))
+  };
+}
+
 // ── Message Format Conversion ─────────────────────────────────────────────────
 
 /**
@@ -298,6 +311,34 @@ function toOpenAIMessages(systemPrompt, messages, pendingToolResults = null) {
     }
   }
   return result;
+}
+
+/**
+ * Convert internal messages → Google contents format
+ */
+function toGoogleMessages(messages) {
+  return messages.map(m => {
+    const parts = [];
+    if (m.content) parts.push({ text: m.content });
+
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      m.toolCalls.forEach(tc => {
+        parts.push({ functionCall: { name: tc.name, args: tc.input } });
+      });
+    }
+
+    if (m.role === 'tool' || m.role === 'function') {
+      return {
+        role: 'function',
+        parts: m.content ? [{ functionResponse: { name: m.tool_name || m.name, response: { content: m.content } } }] : []
+      };
+    }
+
+    return {
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts
+    };
+  });
 }
 
 // ── System Prompt Builder ────────────────────────────────────────────────────
@@ -365,16 +406,21 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
   return `You are an expert boxing coach embedded inside the athlete's training app. You speak the same language as the athlete (Italian if they write in Italian, English if they write in English). Be direct and act like a real coach — not an assistant.
 
 ═══ COACHING RULES (non-negotiable) ═══
-1. ACT FIRST, explain after. Never ask "should I change X?" — just change it and tell the athlete what you did.
-2. Be CONCISE: 2-4 sentences for check-ins, more only when building a full schedule.
+1. ACT FIRST, explain after. NEVER apologize. NEVER use long intros or filler phrases. Go straight to the point.
+2. Be EXTREMELY CONCISE: 1-2 sentences for check-ins, skip the niceties.
 3. ALWAYS call update_coach_memory when you detect any preference, dislike, pattern, or milestone. This is mandatory.
 4. When an athlete reports a problem with an exercise → immediately replace or reschedule it.
-5. When creating exercises, ALWAYS include structured steps (timer/interval/sets/text types) so the guided timer works. Set prepTime for steps where the user needs extra time to change equipment (e.g., from heavy bag to skipping rope).
+5. When creating/modifying exercises, ALWAYS include structured steps (timer/interval/sets/text types) so the guided timer works.
 6. Step IDs: 's1', 's2', etc. Exercise IDs: use Date.now() as string. Durations always in seconds.
 7. GOALS: Always consider the user's short/long-term goals when planning, even if they have no specific target date.
 8. STRETCHING: Always include a 'Recovery' exercise or 'text' steps at the end of workouts with contextual stretching targeting the specific muscles used that day.
 9. LOCATIONS: If the user has defined training locations/equipment, plan workouts strictly based on the equipment available at their chosen location.
-10. MEMORY: Be highly selective. Only store meaningful insights, enduring preferences, or significant milestones. Do not log raw session summaries.
+11. TIMING: Always set the 'plannedTime' field in HH:mm format (e.g. "17:30"). Never omit it if a specific time is mentioned. Orario sugerito: "specifica mattina, pomeriggio o sera se non hai orario preciso".
+12. GYM vs HOME:
+    - iGym / Orbean: These locations have FIXED course schedules. If the athlete mentions a course at these locations, DO NOT attempt to "structure" or "add steps" to it beyond simple placeholders. It is a fixed group class.
+    - Home / Parco: No scheduled courses here. You ARE responsible for providing a detailed, structured workout with steps.
+13. MEMORY: Be highly selective. Only store meaningful insights, enduring preferences, or significant milestones. Do not log raw session summaries.
+14. MULTIPLE TOOLS: If a user request requires multiple changes (e.g. remove X, add Y, and modify Z), you MUST call all appropriate tools in the SAME response. Do not perform changes one by one.
 
 ═══ SMART TRIGGERS (act on these automatically) ═══
 - Energy ≤5 reported → lighten tomorrow's session, store in patterns memory
@@ -384,7 +430,10 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
 - Thursday or later in week → proactively offer next week planning
 - Athlete mentions a goal → use update_goal to save it immediately
 
-${smartFlags.length > 0 ? `═══ ACTIVE FLAGS ═══\n${smartFlags.join('\n')}\n` : ''}
+You are the coach for an athlete who is ${profile.age} years old with ${profile.experience} of experience. Use this information to calibrate your technical authority. Be the professional expert they need to prepare for their first competition.
+
+═══ ACTIVE FLAGS ═══
+${smartFlags.length > 0 ? smartFlags.join('\n') : 'None.'}
 TODAY: ${today} (${todayDay})
 CURRENT WEEK: ${currentWeekId}
 
@@ -537,6 +586,53 @@ async function parseOpenAIStream(reader, { onTextChunk, onToolUse }) {
   return { text: fullText, toolUses };
 }
 
+async function parseGoogleStream(reader, { onTextChunk, onToolUse }) {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+  let toolUses = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (!data) continue;
+
+      try {
+        const chunk = JSON.parse(data);
+        const parts = chunk.candidates?.[0]?.content?.parts || [];
+
+        for (const part of parts) {
+          if (part.text) {
+            fullText += part.text;
+            if (onTextChunk) onTextChunk(part.text);
+          }
+          if (part.functionCall) {
+            const tc = {
+              id: `gc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+              name: part.functionCall.name,
+              input: part.functionCall.args || {}
+            };
+            toolUses.push(tc);
+            if (onToolUse) onToolUse(tc);
+          }
+        }
+      } catch (e) {
+        // Ignore JSON parse errors for empty/malformed lines
+      }
+    }
+  }
+
+  return { text: fullText, toolUses };
+}
+
 // ── API Communication ────────────────────────────────────────────────────────
 
 export async function sendCoachMessage({
@@ -564,6 +660,19 @@ export async function sendCoachMessage({
           stream: true
         })
       });
+    } else if (provider === 'google') {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: toGoogleMessages(messages),
+            tools: [convertToolsToGoogle(coachTools)]
+          })
+        }
+      );
     } else {
       response = await fetch(ANTHROPIC_URL, {
         method: 'POST',
@@ -595,7 +704,10 @@ export async function sendCoachMessage({
     }
 
     const reader = response.body.getReader();
-    const parser = provider === 'openrouter' ? parseOpenAIStream : parseAnthropicStream;
+    const parser = 
+      provider === 'openrouter' ? parseOpenAIStream : 
+      provider === 'google' ? parseGoogleStream : 
+      parseAnthropicStream;
     const result = await parser(reader, { onTextChunk, onToolUse });
 
     if (onComplete) onComplete(result);
@@ -637,6 +749,28 @@ export async function sendToolResults({
           stream: true
         })
       });
+    } else if (provider === 'google') {
+      const toolResultMessage = {
+        role: 'function',
+        parts: toolResults.map(tr => ({
+          functionResponse: {
+            name: tr.tool_name,
+            response: { content: tr.content }
+          }
+        }))
+      };
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [...toGoogleMessages(messages), toolResultMessage],
+            tools: [convertToolsToGoogle(coachTools)]
+          })
+        }
+      );
     } else {
       // For Anthropic: tool results go as a 'user' message with tool_result content
       const toolResultMessage = {
@@ -677,7 +811,10 @@ export async function sendToolResults({
     }
 
     const reader = response.body.getReader();
-    const parser = provider === 'openrouter' ? parseOpenAIStream : parseAnthropicStream;
+    const parser = 
+      provider === 'openrouter' ? parseOpenAIStream : 
+      provider === 'google' ? parseGoogleStream : 
+      parseAnthropicStream;
     const result = await parser(reader, { onTextChunk, onToolUse });
 
     if (onComplete) onComplete(result);

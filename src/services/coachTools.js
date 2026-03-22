@@ -59,6 +59,7 @@ export function executeToolCall(toolName, toolInput, appState) {
         name: exercise.name,
         done: false,
         notes: exercise.notes || '',
+        plannedTime: exercise.plannedTime || '',
         steps
       };
 
@@ -105,6 +106,7 @@ export function executeToolCall(toolName, toolInput, appState) {
         name: newExercise.name,
         done: false,
         notes: newExercise.notes || '',
+        plannedTime: newExercise.plannedTime || '',
         steps
       };
       setSchedule(newSchedule);
@@ -148,6 +150,7 @@ export function executeToolCall(toolName, toolInput, appState) {
             name: ex.name || 'Unnamed Exercise',
             done: false,
             notes: ex.notes || '',
+            plannedTime: ex.plannedTime || '',
             steps
           };
         });
@@ -185,6 +188,7 @@ export function executeToolCall(toolName, toolInput, appState) {
             name: ex.name || 'Unnamed Exercise',
             done: false,
             notes: ex.notes || '',
+            plannedTime: ex.plannedTime || '',
             steps
           };
         });

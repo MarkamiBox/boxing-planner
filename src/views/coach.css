@@ -56,6 +56,35 @@
   max-width: 400px;
 }
 
+.setup-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 400px;
+  text-align: left;
+}
+
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.setup-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.setup-field input {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  font-family: monospace;
+}
+
 /* ── Chat Area ──────────────────────────────────────────────────────── */
 
 .coach-header {
@@ -418,15 +447,455 @@
   font-size: 0.85rem;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────────── */
+/* ── Approval Card ──────────────────────────────────────────────────── */
 
-@media (max-width: 480px) {
-  .coach-msg {
-    max-width: 92%;
-    font-size: 0.9rem;
-  }
+.coach-approval-card {
+  align-self: center;
+  width: 100%;
+  max-width: 450px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  animation: slideUp 0.3s ease-out;
+}
 
-  .coach-schedule-preview {
-    max-height: 150px;
-  }
+.coach-approval-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.coach-approval-card p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.approval-list {
+  background: rgba(0,0,0,0.05);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 1.25rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.approval-item {
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.approval-subtext {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.approval-time-tag {
+  color: var(--primary);
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.approval-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.approval-detailed-summary {
+  margin-top: 8px;
+  background: rgba(0,0,0,0.15);
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approval-day-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.day-abbr {
+  width: 32px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.ex-names {
+  flex: 1;
+  color: var(--text-main);
+}
+
+.type-tag {
+  font-size: 0.7rem;
+  color: var(--primary);
+  opacity: 0.8;
+  margin-left: 4px;
+}
+
+.time-tag {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+.approval-notes {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: 4px;
+  border-left: 2px solid var(--border-color);
+  padding-left: 6px;
+}
+
+
+/* Mini Schedule Preview */
+.mini-schedule-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 12px 0;
+  background: rgba(0,0,0,0.2);
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.mini-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.mini-day.changed {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+}
+
+.mini-day-name {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.mini-day-indicators {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+
+.indicator {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.indicator.add { background: #4ade80; }
+.indicator.rem { background: #f87171; }
+.indicator.mod { background: #fbbf24; }
+
+.coach-msg.assistant .undo-btn {
+  margin-top: 8px;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.coach-msg.assistant .undo-btn:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-color);
+}
+
+.approval-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.approval-actions button {
+  flex: 1;
+  padding: 0.6rem;
+  font-size: 0.85rem;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Visual Preview Dashboard ───────────────────────────────────────── */
+.coach-visual-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.preview-day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  background: rgba(0,0,0,0.2);
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+}
+
+.current-day-label {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--primary);
+  letter-spacing: 0.1em;
+}
+
+.preview-day-nav button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+
+.preview-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.preview-ex-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.preview-ex-card.status-added {
+  border: 1px solid #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.1);
+}
+
+.preview-ex-card.status-removed {
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  opacity: 0.85;
+}
+
+.preview-ex-card.status-removed::after {
+  content: "DA RIMUOVERE";
+  position: absolute;
+  top: 3rem;
+  right: 0.75rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.preview-ex-card.status-added::after {
+  content: "NUOVO";
+  position: absolute;
+  top: 3rem;
+  right: 0.75rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.preview-ex-card.status-modified {
+  border: 1px solid #eab308;
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.preview-ex-card.status-modified::after {
+  content: "MODIFICATO";
+  position: absolute;
+  top: 3rem;
+  right: 0.75rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.preview-ex-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 4px;
+}
+
+.preview-ex-type {
+  font-size: 0.6rem;
+  padding: 2px 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.preview-ex-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.status-badge {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.status-added .status-badge { background: #4ade80; color: #064e3b; }
+.status-removed .status-badge { background: #f87171; color: #450a0a; }
+.status-modified .status-badge { background: #fbbf24; color: #451a03; }
+
+.preview-ex-time {
+  font-size: 0.8rem;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.preview-ex-notes {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.preview-ex-steps-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.preview-tools-toggle {
+  background: rgba(0,0,0,0.1);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.preview-tools-toggle h5 {
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+}
+
+.tool-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.tool-toggle-item.disabled {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.tool-toggle-item input {
+  cursor: pointer;
+}
+
+.preview-ex-card.is-disabled {
+  opacity: 0.25;
+  filter: grayscale(1) brightness(0.7);
+  border-style: dashed;
+}
+
+.preview-edit-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.preview-edit-btn:hover {
+  background: var(--surface-hover);
+  color: var(--primary);
+}
+
+.preview-edit-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-color);
+  z-index: 100;
+  padding: 1rem;
+  overflow-y: auto;
+  border-radius: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Re-using some schedule classes for consistency */
+.exercise-editor textarea {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-main);
+  padding: 0.5rem;
+}
+
+.exercise-editor input, .exercise-editor select {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-main);
+  padding: 4px 8px;
 }
