@@ -1,25 +1,78 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-export function QuickLogSheet({ exercise, onSave, onSkip, onCancel }) {
+export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
+  const recentLogWithWeight = logs?.find(l => l.bodyWeight);
+  const recentLogWithSleep = logs?.find(l => l.sleepHours || l.sleepQuality);
+
+  const calculateDuration = () => {
+    if (!exercise || !exercise.steps) return '';
+    let totalSec = 0;
+    exercise.steps.forEach(s => {
+      let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
+      if(s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
+      else if(s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
+      else if(s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
+      else if(s.type === 'text') totalSec += Number(s.duration || 0) + prep;
+    });
+    return totalSec > 0 ? String(Math.round(totalSec / 60)) : '';
+  };
+
+  const [durationStr, setDurationStr] = useState(calculateDuration());
+
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);
-  const [soreness, setSoreness] = useState(3);
-  const [sleepHours, setSleepHours] = useState('');
+  const [legs, setLegs] = useState(7);
+  const [intensity, setIntensity] = useState(7);
+  const [focus, setFocus] = useState(7);
+  
+  const [distance, setDistance] = useState('');
+  const [pace, setPace] = useState('');
+  const [time, setTime] = useState('');
+
+  const [sparringRounds, setSparringRounds] = useState(0);
+  const [lastRoundDrop, setLastRoundDrop] = useState(5);
+
+  const [musclesSoreness, setSoreness] = useState(3);
+  const [sleepHours, setSleepHours] = useState(recentLogWithSleep?.sleepHours || '');
+  const [sleepQuality, setSleepQuality] = useState(recentLogWithSleep?.sleepQuality || 7);
+  const [bodyWeight, setBodyWeight] = useState(recentLogWithWeight?.bodyWeight || '');
+
   const [notes, setNotes] = useState('');
 
   const handleSave = () => {
+    let specificData = {};
+    if (exercise.type === 'Running') {
+      specificData = { distance, pace, time };
+    } else if (exercise.type === 'Boxing') {
+      specificData = { sparringRounds, lastRoundDrop };
+    }
+
     onSave({
+      duration: durationStr ? durationStr + ' min' : '',
       energy,
       cardio,
-      musclesSoreness: soreness,
+      legs,
+      intensity,
+      focus,
+      musclesSoreness,
       sleepHours: sleepHours ? Number(sleepHours) : null,
+      sleepQuality,
+      bodyWeight: bodyWeight ? Number(bodyWeight) : null,
       notes: notes.trim() || undefined,
+      ...specificData
     });
   };
 
   const sliderStyle = { width: '100%', accentColor: 'var(--primary)' };
   const labelStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' };
+
+  const renderSlider = (label, value, setter) => (
+    <div style={{ marginBottom: '0.75rem' }}>
+      <div style={labelStyle}><span>{label}</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{value}/10</span></div>
+      <input type="range" min="1" max="10" value={value} onChange={e => setter(Number(e.target.value))} style={sliderStyle} />
+    </div>
+  );
 
   return (
     <>
@@ -32,7 +85,8 @@ export function QuickLogSheet({ exercise, onSave, onSkip, onCancel }) {
         background: 'var(--bg-color)', borderTop: '1px solid var(--border-color)',
         borderRadius: '1rem 1rem 0 0', padding: '1.25rem 1.25rem 1.5rem',
         zIndex: 500, maxWidth: '600px', margin: '0 auto',
-        animation: 'slideUp 0.25s ease-out'
+        animation: 'slideUp 0.25s ease-out',
+        maxHeight: '90vh', overflowY: 'auto'
       }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -46,30 +100,67 @@ export function QuickLogSheet({ exercise, onSave, onSkip, onCancel }) {
           </button>
         </div>
 
-        {/* Sliders */}
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={labelStyle}><span>Energia</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{energy}/10</span></div>
-          <input type="range" min="1" max="10" value={energy} onChange={e => setEnergy(Number(e.target.value))} style={sliderStyle} />
-        </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={labelStyle}><span>Cardio</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{cardio}/10</span></div>
-          <input type="range" min="1" max="10" value={cardio} onChange={e => setCardio(Number(e.target.value))} style={sliderStyle} />
-        </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={labelStyle}><span>Dolori muscolari</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{soreness}/10</span></div>
-          <input type="range" min="1" max="10" value={soreness} onChange={e => setSoreness(Number(e.target.value))} style={sliderStyle} />
-        </div>
-
-        {/* Sleep */}
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={labelStyle}><span>Ore di sonno (opzionale)</span></div>
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={labelStyle}><span>Duration (mins)</span></div>
           <input
-            type="number" min="0" max="24" step="0.5" value={sleepHours}
-            placeholder="es. 7.5"
-            onChange={e => setSleepHours(e.target.value)}
-            style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem' }}
+            type="text" value={durationStr} placeholder="e.g. 60"
+            onChange={e => setDurationStr(e.target.value)}
+            style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }}
           />
         </div>
+
+        {/* Sliders */}
+        {renderSlider('Energia', energy, setEnergy)}
+        {renderSlider('Cardio', cardio, setCardio)}
+        {renderSlider('Gambe', legs, setLegs)}
+        {renderSlider('Intensità', intensity, setIntensity)}
+        {renderSlider('Focus Mentale', focus, setFocus)}
+
+        {exercise.type === 'Running' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div>
+              <div style={{...labelStyle, fontSize: '0.75rem'}}>Dst (km)</div>
+              <input type="text" value={distance} onChange={e => setDistance(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} />
+            </div>
+            <div>
+              <div style={{...labelStyle, fontSize: '0.75rem'}}>Pace</div>
+              <input type="text" value={pace} onChange={e => setPace(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} placeholder="5:30" />
+            </div>
+            <div>
+              <div style={{...labelStyle, fontSize: '0.75rem'}}>Time</div>
+              <input type="text" value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} placeholder="25:00" />
+            </div>
+          </div>
+        )}
+
+        {exercise.type === 'Boxing' && (
+           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+             <div style={{ flex: 1 }}>
+               <div style={{...labelStyle, fontSize: '0.75rem'}}>Sparring Rnd</div>
+               <input type="number" min="0" value={sparringRounds} onChange={e => setSparringRounds(Number(e.target.value))} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} />
+             </div>
+             {sparringRounds > 0 && (
+               <div style={{ flex: 2 }}>
+                 {renderSlider('Last Rnd Drop (1=Bad)', lastRoundDrop, setLastRoundDrop)}
+               </div>
+             )}
+           </div>
+        )}
+
+        {renderSlider('Dolori muscolari', musclesSoreness, setSoreness)}
+
+        {/* Body & Sleep */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{...labelStyle, fontSize: '0.75rem'}}>Peso (kg)</div>
+            <input type="number" step="0.1" value={bodyWeight} onChange={e => setBodyWeight(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{...labelStyle, fontSize: '0.75rem'}}>Ore Sonno</div>
+            <input type="number" step="0.5" value={sleepHours} onChange={e => setSleepHours(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} />
+          </div>
+        </div>
+        {renderSlider('Qualità Sonno', sleepQuality, setSleepQuality)}
 
         {/* Notes */}
         <div style={{ marginBottom: '1rem' }}>
@@ -77,7 +168,7 @@ export function QuickLogSheet({ exercise, onSave, onSkip, onCancel }) {
           <textarea
             rows={2} value={notes} placeholder="Come è andata?"
             onChange={e => setNotes(e.target.value)}
-            style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', resize: 'none' }}
+            style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', resize: 'none', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }}
           />
         </div>
 

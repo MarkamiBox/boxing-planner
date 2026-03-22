@@ -37,6 +37,17 @@ export function StatsView({ logs, setLogs }) {
     focus: log.focus || 0,
   }));
 
+  // ─── Body & Recovery Trend ───────────────────────────────────────────────────
+  const bodyData = [...logs]
+    .reverse()
+    .filter(l => l.bodyWeight || l.sleepHours || l.sleepQuality)
+    .map(log => ({
+      date: log.date.substring(5),
+      weight: log.bodyWeight || null,
+      sleep: log.sleepHours || null,
+      quality: log.sleepQuality || null,
+    }));
+
   // ─── Weekly Load Bar Chart ───────────────────────────────────────────────────
   const weeklyMap = {};
   logs.forEach(log => {
@@ -210,6 +221,49 @@ export function StatsView({ logs, setLogs }) {
               </div>
             )}
           </div>
+
+          {/* Body and Recovery Charts */}
+          <div className="chart-container card" style={{ marginTop: '1rem' }}>
+            <h3 className="section-title">Body Weight Trend</h3>
+            {bodyData.filter(d => d.weight).length < 2 ? (
+              <div className="empty-state">Log your body weight in at least 2 sessions.</div>
+            ) : (
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={bodyData.filter(d => d.weight)} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} stroke="var(--text-muted)" fontSize={11} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="weight" stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} name="Weight (kg)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="chart-container card" style={{ marginTop: '1rem' }}>
+            <h3 className="section-title">Sleep (Hours & Quality)</h3>
+            {bodyData.filter(d => d.sleep || d.quality).length < 2 ? (
+              <div className="empty-state">Log your sleep in at least 2 sessions.</div>
+            ) : (
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={bodyData.filter(d => d.sleep || d.quality)} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis yAxisId="left" domain={[0, 12]} stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 10]} stroke="var(--text-muted)" fontSize={11} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="sleep" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Hours" />
+                    <Line yAxisId="right" type="monotone" dataKey="quality" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Quality (1-10)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -351,6 +405,8 @@ export function StatsView({ logs, setLogs }) {
                       <span>{log.date}{log.timeOfDay ? ` @ ${log.timeOfDay}` : ''}</span>
                       {log.duration && <span>· {log.duration}</span>}
                       <span>· ⚡{log.energy || '-'} 💨{log.cardio || '-'} 🔥{log.intensity || '-'} 🎯{log.focus || '-'}</span>
+                      {log.bodyWeight && <span>· ⚖️{log.bodyWeight}kg</span>}
+                      {log.sleepHours && <span>· 🛏️{log.sleepHours}h</span>}
                     </div>
                   </div>
                   <button className="btn-icon danger" onClick={() => handleDeleteLog(log.id)} style={{ padding: '6px', flexShrink: 0 }} title="Delete">

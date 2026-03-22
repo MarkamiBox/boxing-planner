@@ -518,7 +518,7 @@ export function CoachView({
         {/* Error */}
         {error && <div className="coach-error">{error}</div>}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} style={{ height: '1px', paddingBottom: '2rem', flexShrink: 0 }} />
       </div>
 
       {/* Input */}

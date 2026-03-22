@@ -14,6 +14,39 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
     startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet
   } = useTimer();
 
+  const getCurrentInstruction = () => {
+    if (!currentStep?.instruction) return null;
+    if (!['interval', 'sets'].includes(currentStep.type)) return currentStep.instruction;
+
+    const segments = currentStep.instruction.split(/(?:\n|\|)/).map(s => s.trim()).filter(Boolean);
+    let roundText = null;
+    let generalText = [];
+
+    segments.forEach(seg => {
+      const match = seg.match(/^(?:R(?:ound)?\s*)?(\d+)[\:\-\.]\s*(.*)/i);
+      if (match) {
+        if (parseInt(match[1], 10) === currentRound) {
+          roundText = match[2];
+        }
+      } else {
+        generalText.push(seg);
+      }
+    });
+
+    if (roundText) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {generalText.length > 0 && <span style={{fontSize: '0.85em', opacity: 0.8}}>{generalText.join('. ')}</span>}
+          <span style={{fontWeight: 700, color: 'var(--primary)', fontSize: '1.1em'}}>
+            R{currentRound}: {roundText}
+          </span>
+        </div>
+      );
+    }
+
+    return currentStep.instruction;
+  };
+
   // Rendering variations based on what's active
   const renderSetsStep = () => {
     return (
@@ -62,7 +95,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
             STEP {currentStepIdx + 1} OF {activeWorkout.steps.length}
           </div>
           <h2 className="step-name">{currentStep.name}</h2>
-          {currentStep.instruction && <p className="step-instruction">{currentStep.instruction}</p>}
+          {currentStep.instruction && <div className="step-instruction">{getCurrentInstruction()}</div>}
         </div>
       )}
 

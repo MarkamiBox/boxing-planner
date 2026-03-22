@@ -8,7 +8,7 @@ import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, setLogs }) {
+export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
   const todayDay = getTodayDayName();
   const isCurrentWeek = currentWeekId === getWeekId();
@@ -18,7 +18,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
 
-  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', steps: [] });
+  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [] });
 
   // JSON Import state
   const [jsonImport, setJsonImport] = useState({ open: false, text: '', error: '' });
@@ -109,6 +109,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       name: exercise.name, 
       type: exercise.type, 
       notes: exercise.notes || '',
+      plannedTime: exercise.plannedTime || '',
       steps: exercise.steps ? JSON.parse(JSON.stringify(exercise.steps)) : [] 
     });
   };
@@ -158,10 +159,11 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       name: 'New Exercise',
       done: false,
       notes: '',
+      plannedTime: '',
       steps: []
     });
     setSchedule(newSchedule);
-    startEdit({ id: newId, type: 'Boxing', name: 'New Exercise', notes: '', steps: [] });
+    startEdit({ id: newId, type: 'Boxing', name: 'New Exercise', notes: '', plannedTime: '', steps: [] });
   };
 
   // ── JSON Import ──────────────────────────────────────────────────────────────
@@ -192,6 +194,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     const normalised = exercises.map((e, i) => ({
       type: 'Boxing',
       notes: '',
+      plannedTime: '',
       steps: [],
       ...e,
       id: (now + i).toString(),
@@ -404,6 +407,12 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                       <option value="Running">Running</option>
                       <option value="Recovery">Recovery</option>
                     </select>
+                    <input 
+                      type="time" 
+                      value={editForm.plannedTime || ''} 
+                      onChange={e => setEditForm({...editForm, plannedTime: e.target.value})}
+                      style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', minWidth: '80px' }}
+                    />
                   </div>
                   <textarea 
                     value={editForm.notes} 
@@ -447,9 +456,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                     <span className="checkmark"></span>
                   </label>
                   <div className="ex-info" style={{ flex: 1 }}>
-                    <div className="ex-title">
+                    <div className="ex-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span className={`tag ${ex.type.toLowerCase()}`}>{ex.type}</span>
-                      <h3>{ex.name}</h3>
+                      <h3 style={{ margin: 0 }}>{ex.name}</h3>
+                      {ex.plannedTime && <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(185, 28, 28, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>🕒 {ex.plannedTime}</span>}
                     </div>
                     {ex.notes && <p className="ex-notes" style={{ whiteSpace: 'pre-line' }}>{ex.notes}</p>}
                     
@@ -602,6 +612,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       {quickLogTarget && (
         <QuickLogSheet
           exercise={quickLogTarget.exercise}
+          logs={logs}
           onSave={(logData) => {
             setLogs(prev => prev.map(l =>
               l.id === quickLogTarget.logId ? { ...l, ...logData } : l

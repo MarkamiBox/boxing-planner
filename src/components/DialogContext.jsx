@@ -52,8 +52,22 @@ export function DialogProvider({ children }) {
     });
   };
 
+  const showPrompt = (title, message, initialValue, onConfirm, onCancel) => {
+    setDialogState({
+      isOpen: true, title, message, type: 'prompt', initialValue,
+      onConfirm: (val) => {
+        setDialogState(prev => ({ ...prev, isOpen: false }));
+        if (onConfirm) onConfirm(val);
+      },
+      onCancel: () => {
+        setDialogState(prev => ({ ...prev, isOpen: false }));
+        if (onCancel) onCancel();
+      }
+    });
+  };
+
   return (
-    <DialogContext.Provider value={{ showAlert, showConfirm, showChoice }}>
+    <DialogContext.Provider value={{ showAlert, showConfirm, showChoice, showPrompt }}>
       {children}
       <CustomDialog state={dialogState} />
     </DialogContext.Provider>

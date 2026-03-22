@@ -44,6 +44,7 @@ export const coachTools = [
                   rounds: { type: 'number' },
                   sets: { type: 'number' },
                   reps: { type: 'string' },
+                  prepTime: { type: 'number', description: 'Preparation time before this step in seconds, e.g. 30' },
                   instruction: { type: 'string' }
                 },
                 required: ['id', 'type', 'name']
@@ -82,6 +83,7 @@ export const coachTools = [
                   rounds: { type: 'number' },
                   sets: { type: 'number' },
                   reps: { type: 'string' },
+                  prepTime: { type: 'number' },
                   instruction: { type: 'string' }
                 },
                 required: ['type', 'name']
@@ -367,8 +369,12 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
 2. Be CONCISE: 2-4 sentences for check-ins, more only when building a full schedule.
 3. ALWAYS call update_coach_memory when you detect any preference, dislike, pattern, or milestone. This is mandatory.
 4. When an athlete reports a problem with an exercise → immediately replace or reschedule it.
-5. When creating exercises, ALWAYS include structured steps (timer/interval/sets/text types) so the guided timer works.
+5. When creating exercises, ALWAYS include structured steps (timer/interval/sets/text types) so the guided timer works. Set prepTime for steps where the user needs extra time to change equipment (e.g., from heavy bag to skipping rope).
 6. Step IDs: 's1', 's2', etc. Exercise IDs: use Date.now() as string. Durations always in seconds.
+7. GOALS: Always consider the user's short/long-term goals when planning, even if they have no specific target date.
+8. STRETCHING: Always include a 'Recovery' exercise or 'text' steps at the end of workouts with contextual stretching targeting the specific muscles used that day.
+9. LOCATIONS: If the user has defined training locations/equipment, plan workouts strictly based on the equipment available at their chosen location.
+10. MEMORY: Be highly selective. Only store meaningful insights, enduring preferences, or significant milestones. Do not log raw session summaries.
 
 ═══ SMART TRIGGERS (act on these automatically) ═══
 - Energy ≤5 reported → lighten tomorrow's session, store in patterns memory
@@ -391,6 +397,9 @@ Resting HR: ${profile.restingHR}bpm${profile.vo2max ? ` | VO2max: ${profile.vo2m
 Technical Levels (1-5):
   Cardio: ${profile.levels.cardio} | Technique: ${profile.levels.technique} | Footwork: ${profile.levels.footwork}
   Defense: ${profile.levels.defense} | Jab: ${profile.levels.jab} | Ring IQ: ${profile.levels.reading}
+
+Locations & Equipment:
+${profile.locations && profile.locations.length > 0 ? profile.locations.map(l => `  - ${l.name}: ${l.equipment}`).join('\n') : '  None specified.'}
 
 ═══ CURRENT STATE ═══
 Recent averages (${recentLogs.length} sessions): Energy ${avgEnergy}/10, Cardio ${avgCardio}/10, Focus ${avgFocus}/10

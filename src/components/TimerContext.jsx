@@ -343,6 +343,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
 
   const skipStep = () => {
     statsTracker.current.skippedSteps += 1;
+    delete timerRef.current.expectedEndTime;
     if (!isGuided) { 
       if (phase === 'work' && currentRound < totalRounds) {
         setPhase('rest');
@@ -355,7 +356,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         stopTimer();
       }
     } else {
-      advanceGuidedStep();
+      handleGuidedTransition();
     }
   };
 

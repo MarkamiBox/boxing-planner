@@ -5,18 +5,32 @@ import './logger.css';
 export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
+  const recentLogWithWeight = logs?.find(l => l.bodyWeight);
+  const recentLogWithSleep = logs?.find(l => l.sleepHours || l.sleepQuality);
+
+  const calculateDuration = (workout) => {
+    if (!workout || !workout.steps) return '';
+    if (workout.timerStats?.actualDuration) {
+      return Math.round(workout.timerStats.actualDuration / 60) + '';
+    }
+    let totalSec = 0;
+    workout.steps.forEach(s => {
+      let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
+      if(s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
+      else if(s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
+      else if(s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
+      else if(s.type === 'text') totalSec += Number(s.duration || 0) + prep;
+    });
+    return totalSec > 0 ? String(Math.round(totalSec / 60)) : '';
+  };
+
   const [date, setDate] = useState(getTodayDate());
   const [type, setType] = useState(activeWorkout ? activeWorkout.type : 'Boxing');
-
   const [timeOfDay, setTimeOfDay] = useState(() => {
     const d = new Date();
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   });
-  const [durationStr, setDurationStr] = useState(
-    activeWorkout?.timerStats?.actualDuration
-      ? Math.round(activeWorkout.timerStats.actualDuration / 60) + ''
-      : ''
-  );
+  const [durationStr, setDurationStr] = useState(activeWorkout ? calculateDuration(activeWorkout) : '');
 
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);
@@ -36,9 +50,9 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   const [lastRoundDrop, setLastRoundDrop] = useState(5);
 
   // Body & recovery
-  const [bodyWeight, setBodyWeight] = useState('');
-  const [sleepHours, setSleepHours] = useState('');
-  const [sleepQuality, setSleepQuality] = useState(7);
+  const [bodyWeight, setBodyWeight] = useState(recentLogWithWeight?.bodyWeight || '');
+  const [sleepHours, setSleepHours] = useState(recentLogWithSleep?.sleepHours || '');
+  const [sleepQuality, setSleepQuality] = useState(recentLogWithSleep?.sleepQuality || 7);
   const [musclesSoreness, setMusclesSoreness] = useState(3);
 
   const [savedMessage, setSavedMessage] = useState(false);
@@ -55,9 +69,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     if (activeWorkout) {
       setType(activeWorkout.type);
       setNotes(`Completed: ${activeWorkout.name}`);
-      if (activeWorkout.timerStats?.actualDuration) {
-        setDurationStr(Math.round(activeWorkout.timerStats.actualDuration / 60) + '');
-      }
+      setDurationStr(calculateDuration(activeWorkout));
     }
   }, [activeWorkout]);
 
@@ -192,102 +204,114 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     <div className="page-container logger-view">
       <h1 className="page-title">Log Session</h1>
 
-      <form className="card" onSubmit={handleSave}>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label>Time of Day</label>
-            <input type="time" value={timeOfDay} onChange={e => setTimeOfDay(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label>Duration (mins)</label>
-            <input type="text" placeholder="e.g. 60" value={durationStr} onChange={e => setDurationStr(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Session Type</label>
-            <select value={type} onChange={e => setType(e.target.value)}>
-              <option value="Boxing">Boxing / Sparring</option>
-              <option value="Running">Running / Cardio</option>
-              <option value="Strength">Strength / Weights</option>
-              <option value="Recovery">Recovery / Rest</option>
+      <form className="card" onSubmit={handleSave} style={{ padding: '1.25rem 1.25rem 1.5rem', borderRadius: '1rem', background: 'var(--bg-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, marginBottom: '2px' }}>✓ Completato</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{activeWorkout ? activeWorkout.name : 'Log Manuale'}</div>
+            <select value={type} onChange={e => setType(e.target.value)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', outline: 'none' }}>
+              <option value="Boxing">Boxing</option>
+              <option value="Running">Running</option>
+              <option value="Strength">Strength</option>
+              <option value="Recovery">Recovery</option>
             </select>
           </div>
         </div>
 
-        <h3 className="section-title">General Stats</h3>
-        {renderSlider("Energy Level", energy, setEnergy)}
-        {renderSlider("Cardio / Breath", cardio, setCardio)}
-        {renderSlider("Legs Freshness", legs, setLegs)}
-        {renderSlider("Workout Intensity", intensity, setIntensity)}
-        {renderSlider("Mental Focus", focus, setFocus)}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Data</div>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} required style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Ora</div>
+            <input type="time" value={timeOfDay} onChange={e => setTimeOfDay(e.target.value)} required style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}><span>Duration (mins)</span></div>
+          <input type="text" placeholder="e.g. 60" value={durationStr} onChange={e => setDurationStr(e.target.value)} style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
+        </div>
+
+        {/* Sliders mimicking QuickLogSheet */}
+        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Energia</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{energy}/10</span></div>
+          <input type="range" min="1" max="10" value={energy} onChange={e => setEnergy(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cardio</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{cardio}/10</span></div>
+          <input type="range" min="1" max="10" value={cardio} onChange={e => setCardio(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Gambe</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{legs}/10</span></div>
+          <input type="range" min="1" max="10" value={legs} onChange={e => setLegs(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Intensità</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{intensity}/10</span></div>
+          <input type="range" min="1" max="10" value={intensity} onChange={e => setIntensity(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Focus Mentale</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{focus}/10</span></div>
+          <input type="range" min="1" max="10" value={focus} onChange={e => setFocus(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+        </div>
 
         {type === 'Running' && (
-          <>
-            <h3 className="section-title">Running Details</h3>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Distance (km/m)</label>
-                <input type="text" placeholder="e.g. 5km" value={distance} onChange={e => setDistance(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Pace (min/km)</label>
-                <input type="text" placeholder="e.g. 5:30" value={pace} onChange={e => setPace(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Total Time</label>
-                <input type="text" placeholder="e.g. 28:00" value={time} onChange={e => setTime(e.target.value)} />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Dst (km)</div>
+              <input type="text" value={distance} onChange={e => setDistance(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
             </div>
-          </>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Pace</div>
+              <input type="text" value={pace} onChange={e => setPace(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} placeholder="5:30" />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Time</div>
+              <input type="text" value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} placeholder="25:00" />
+            </div>
+          </div>
         )}
 
         {type === 'Boxing' && (
-          <>
-            <h3 className="section-title">Boxing Details</h3>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Sparring Rounds (if any)</label>
-                <input type="number" min="0" value={sparringRounds} onChange={e => setSparringRounds(Number(e.target.value))} />
-              </div>
-              {sparringRounds > 0 && (
-                <div className="form-group" style={{ flex: 1.5 }}>
-                  {renderSlider("Last Round Performance Drop (1=Bad, 10=Strong)", lastRoundDrop, setLastRoundDrop)}
-                </div>
-              )}
-            </div>
-          </>
+           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+             <div style={{ flex: 1 }}>
+               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Sparring Rnd</div>
+               <input type="number" min="0" value={sparringRounds} onChange={e => setSparringRounds(Number(e.target.value))} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
+             </div>
+             {sparringRounds > 0 && (
+               <div style={{ flex: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Last Rnd Drop (1=Bad)</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{lastRoundDrop}/10</span></div>
+                  <input type="range" min="1" max="10" value={lastRoundDrop} onChange={e => setLastRoundDrop(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '0.25rem' }} />
+               </div>
+             )}
+           </div>
         )}
 
-        <div className="form-group" style={{ marginTop: '1.5rem' }}>
-          <label>Free Notes</label>
-          <textarea
-            rows="3"
-            placeholder="How did you feel? Techniques worked on?"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-          ></textarea>
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Dolori muscolari</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{musclesSoreness}/10</span></div>
+          <input type="range" min="1" max="10" value={musclesSoreness} onChange={e => setMusclesSoreness(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '0.25rem' }} />
         </div>
 
-        <h3 className="section-title" style={{ marginTop: '1.5rem' }}>Body & Recovery</h3>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Body Weight (kg)</label>
-            <input type="number" step="0.1" placeholder="e.g. 70.5" value={bodyWeight} onChange={e => setBodyWeight(e.target.value)} />
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Peso (kg)</div>
+            <input type="number" step="0.1" value={bodyWeight} onChange={e => setBodyWeight(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
           </div>
-          <div className="form-group">
-            <label>Sleep (hours)</label>
-            <input type="number" step="0.5" placeholder="e.g. 7.5" value={sleepHours} onChange={e => setSleepHours(e.target.value)} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Ore Sonno</div>
+            <input type="number" step="0.5" value={sleepHours} onChange={e => setSleepHours(e.target.value)} style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
           </div>
         </div>
-        {renderSlider('Sleep Quality', sleepQuality, setSleepQuality)}
-        {renderSlider('Muscle Soreness (1=none, 10=very sore)', musclesSoreness, setMusclesSoreness)}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Qualità Sonno</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{sleepQuality}/10</span></div>
+          <input type="range" min="1" max="10" value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '0.25rem' }} />
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}><span>Note (opzionale)</span></div>
+          <textarea rows="2" placeholder="Come è andata?" value={notes} onChange={e => setNotes(e.target.value)} style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.9rem', resize: 'none', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)' }} />
+        </div>
 
         <div className="form-actions">
-          <button type="submit" className="btn-primary w-full">
-            {savedMessage ? <><CheckCircle /> Saved!</> : <><Save /> Save Session</>}
+          <button type="submit" className="btn-primary w-full" style={{ padding: '0.75rem' }}>
+            {savedMessage ? <><CheckCircle size={18} style={{ marginRight: '6px' }} /> Salvato!</> : <><Save size={18} style={{ marginRight: '6px' }} /> Salva Sessione</>}
           </button>
         </div>
       </form>
@@ -369,6 +393,8 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
                     <span title="Legs">🦵 {log.legs || '-'}</span>
                     <span title="Intensity">🔥 {log.intensity || '-'}</span>
                     <span title="Focus">🎯 {log.focus || '-'}</span>
+                    {log.bodyWeight && <span title="Peso">⚖️ {log.bodyWeight}kg</span>}
+                    {log.sleepHours && <span title="Sonno">🛏️ {log.sleepHours}h</span>}
                     {log.type === 'Running' && log.distance && <span>📍 {log.distance}</span>}
                     {log.sparringRounds > 0 && <span>🥊 {log.sparringRounds} rnd</span>}
                   </div>

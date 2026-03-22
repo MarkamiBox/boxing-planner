@@ -148,7 +148,6 @@ input:focus, select:focus, textarea:focus {
 .main-content {
   flex: 1;
   padding: 1rem;
-  padding-top: calc(48px + 1rem); /* Space for mobile topbar */
   padding-bottom: 5rem; /* Space for bottom nav on mobile */
   max-width: 1200px;
   margin: 0 auto;
@@ -158,7 +157,6 @@ input:focus, select:focus, textarea:focus {
 /* Responsive */
 @media (min-width: 768px) {
   .main-content {
-    padding-top: 1rem; /* No topbar on desktop */
     padding-bottom: 2rem;
     padding-left: 2rem;
   }

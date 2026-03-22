@@ -1,18 +1,21 @@
 import React, { useState, useRef } from 'react';
-import { Copy, Save, Check, Download, Upload, Plus, Trash2, Target, CheckCircle } from 'lucide-react';
+import { Copy, Save, Check, Download, Upload, Plus, Trash2, Target, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
 
 export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals }) {
-  const { showAlert, showConfirm } = useDialog();
+  // Hook usage moved down to line 16 for additional features
+
   const [localProfile, setLocalProfile] = useState(profile);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const fileInputRef = useRef(null);
-  const logsInputRef = useRef(null);
+  const [expandedLocs, setExpandedLocs] = useState({});
+
+  const toggleLoc = (idx) => setExpandedLocs(p => ({ ...p, [idx]: !p[idx] }));
 
   const { schedule, setSchedule } = useAppState();
+  const { showAlert, showConfirm, showChoice, showPrompt } = useDialog();
 
   const handleChange = (field, value) => {
     setLocalProfile(prev => ({ ...prev, [field]: value }));
@@ -25,70 +28,209 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     }));
   };
 
+  const addLocation = () => {
+    setLocalProfile(prev => ({
+      ...prev,
+      locations: [...(prev.locations || []), { name: '', equipment: '' }]
+    }));
+  };
+
+  const removeLocation = (idx) => {
+    setLocalProfile(prev => ({
+      ...prev,
+      locations: (prev.locations || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleLocationChange = (idx, field, value) => {
+    setLocalProfile(prev => {
+      const newLocs = [...(prev.locations || [])];
+      newLocs[idx][field] = value;
+      return { ...prev, locations: newLocs };
+    });
+  };
+
+  const handleAttachLocationSchedule = (idx) => {
+    showChoice("Update Courses", "How would you like to provide the courses schedule for this location?", [
+      { 
+        label: "Upload JSON File", 
+        onClick: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const scheduleData = JSON.parse(event.target.result);
+                handleLocationChange(idx, 'schedule', scheduleData);
+                showAlert("Success", "Courses schedule uploaded for location! Don't forget to push Save Profile Changes.");
+              } catch (err) {
+                showAlert("Error", "Invalid JSON format.");
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }
+      },
+      {
+        label: "Paste JSON Text",
+        onClick: () => {
+          const currentData = localProfile.locations[idx].schedule;
+          const initial = currentData ? JSON.stringify(currentData, null, 2) : '';
+          showPrompt("Paste Schedule", "Paste your courses JSON array here:", initial, (text) => {
+            if (!text) return;
+            try {
+              const scheduleData = JSON.parse(text);
+              handleLocationChange(idx, 'schedule', scheduleData);
+              showAlert("Success", "Courses schedule updated! Don't forget to push Save Profile Changes.");
+            } catch (err) {
+              showAlert("Error", "Invalid JSON format. Please ensure it is a valid JSON array.");
+            }
+          });
+        }
+      },
+      { label: "Cancel", className: "btn-secondary" }
+    ]);
+  };
+
   const handleSave = () => {
     setProfile(localProfile);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(schedule, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "boxing_schedule_" + new Date().toISOString().split('T')[0] + ".json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const handleExportLogs = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "boxing_logs_" + new Date().toISOString().split('T')[0] + ".json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const handleImportLogs = (e) => {
-    const fileReader = new FileReader();
-    if (e.target.files[0]) {
-      fileReader.readAsText(e.target.files[0], "UTF-8");
-      fileReader.onload = (event) => {
-        try {
-          const importedLogs = JSON.parse(event.target.result);
-          if (Array.isArray(importedLogs)) {
-            setLogs(importedLogs);
-            showAlert("Successo", "Log importati con successo!");
-          } else {
-            showAlert("Errore", "Struttura JSON non valida per i log.");
-          }
-        } catch (err) {
-          showAlert("Errore", "Errore nella lettura del JSON dei log.");
+  const handleExportWithChoice = (title, dataObj, filenameBase) => {
+    showChoice(title, "How would you like to export?", [
+      {
+        label: "Download JSON File",
+        onClick: () => {
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataObj, null, 2));
+          const a = document.createElement('a');
+          a.href = dataStr;
+          a.download = `${filenameBase}_${new Date().toISOString().split('T')[0]}.json`;
+          a.click();
         }
-      };
+      },
+      {
+        label: "Copy to Clipboard",
+        onClick: () => {
+          const text = JSON.stringify(dataObj, null, 2);
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+              showAlert("Success", `${title} copied to clipboard!`);
+            });
+          } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+              document.execCommand('copy');
+              showAlert("Success", `${title} copied to clipboard!`);
+            } catch (err) {
+              showAlert('Error', 'Copy failed. Try downloading instead.');
+            }
+            document.body.removeChild(textArea);
+          }
+        }
+      },
+      { label: "Cancel", className: "btn-secondary" }
+    ]);
+  };
+
+  const handleExportJSON = () => handleExportWithChoice("Schedule", schedule, "boxing_schedule");
+  const handleExportLogs = () => handleExportWithChoice("Logs", logs, "boxing_logs");
+
+  const handleImportWithChoice = (title, onFile, onText) => {
+    showChoice(title, "How would you like to import?", [
+      {
+        label: "Upload JSON File",
+        onClick: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = (e) => {
+             const file = e.target.files[0];
+             if (!file) return;
+             const reader = new FileReader();
+             reader.onload = (event) => onFile(event.target.result);
+             reader.readAsText(file);
+          };
+          input.click();
+        }
+      },
+      {
+        label: "Paste JSON Text",
+        onClick: () => {
+          showPrompt(title, "Paste your JSON data here:", "", (text) => {
+            if (text) onText(text);
+          });
+        }
+      },
+      { label: "Cancel", className: "btn-secondary" }
+    ]);
+  };
+
+  const handleImportLogs = (text) => {
+    try {
+      const importedLogs = JSON.parse(text);
+      if (Array.isArray(importedLogs)) {
+        setLogs(importedLogs);
+        showAlert("Success", "Logs imported successfully!");
+      } else {
+        showAlert("Error", "Invalid JSON structure for logs.");
+      }
+    } catch (err) {
+      showAlert("Error", "Error parsing JSON.");
     }
   };
 
-  const handleImportJSON = (e) => {
-    const fileReader = new FileReader();
-    if (e.target.files[0]) {
-      fileReader.readAsText(e.target.files[0], "UTF-8");
-      fileReader.onload = (event) => {
-        try {
-          const importedSchedule = JSON.parse(event.target.result);
-          // basic validation
-          if (importedSchedule.monday && importedSchedule.sunday) {
-            setSchedule(importedSchedule); // This sets the currentWeekId specifically due to useAppState abstraction
-            showAlert("Successo", "Scheda importata con successo nella settimana corrente! Le tue settimane passate rimangono intatte nello storico, mentre le settimane future (ancora vuote) si baseranno su questa nuova scheda.");
-          } else {
-            showAlert("Errore", "Struttura JSON non valida per la scheda.");
-          }
-        } catch (err) {
-          showAlert("Errore", "Errore nella lettura del JSON. Assicurati che sia valido.");
-        }
-      };
+  const handleImportJSON = (text) => {
+    try {
+      const importedSchedule = JSON.parse(text);
+      if (importedSchedule.monday && importedSchedule.sunday) {
+        setSchedule(importedSchedule); 
+        showAlert("Success", "Schedule imported into the current week successfully!");
+      } else {
+        showAlert("Error", "Invalid JSON structure for schedule.");
+      }
+    } catch (err) {
+      showAlert("Error", "Error parsing JSON.");
+    }
+  };
+
+  const handleExportAccount = () => {
+    const data = {};
+    for (let i = 0; i < window.localStorage.length; i++) {
+       const key = window.localStorage.key(i);
+       if (key && key.startsWith('bxng_')) {
+          try {
+            data[key] = JSON.parse(window.localStorage.getItem(key));
+          } catch(e) {}
+       }
+    }
+    handleExportWithChoice("Full Account", data, "boxing_planner_backup");
+  };
+
+  const handleImportAccount = (text) => {
+    try {
+      const data = JSON.parse(text);
+      if (!data.bxng_profile) throw new Error("Invalid format");
+      showConfirm("Restore Account", "This will overwrite your ENTIRE account data (logs, schedule, profile). Are you sure?", () => {
+         Object.keys(data).forEach(key => {
+            if (key.startsWith('bxng_')) {
+               window.localStorage.setItem(key, JSON.stringify(data[key]));
+            }
+         });
+         window.location.reload(); 
+      });
+    } catch(e) {
+      showAlert("Error", "Invalid account backup JSON.");
     }
   };
 
@@ -320,6 +462,48 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           {renderLevelSlider("Opponent Reading", "reading")}
         </div>
 
+        <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Locations & Equipment</h3>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {(localProfile.locations || []).map((loc, idx) => (
+             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                 <input type="text" value={loc.name} onChange={e => handleLocationChange(idx, 'name', e.target.value)} placeholder="Location (e.g. Home)" style={{ flex: 1 }} />
+                 <input type="text" value={loc.equipment} onChange={e => handleLocationChange(idx, 'equipment', e.target.value)} placeholder="Equipment (e.g. Heavy Bag, Dumbbells)" style={{ flex: 2 }} />
+                 <button className="btn-icon danger" onClick={() => removeLocation(idx)} style={{ padding: '6px' }}><Trash2 size={16}/></button>
+               </div>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                   {loc.schedule ? `✅ ${Array.isArray(loc.schedule) ? loc.schedule.length : Object.keys(loc.schedule).length} courses loaded` : `No courses schedule loaded`}
+                 </span>
+                 <button className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleAttachLocationSchedule(idx)}>
+                   <Upload size={14} style={{ marginRight: '4px' }}/> {loc.schedule ? 'Manage Courses' : 'Set Courses'}
+                 </button>
+               </div>
+               {loc.schedule && (
+                 <div style={{ marginTop: '0.5rem', background: 'var(--bg-color)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8rem' }}>
+                   <button onClick={() => toggleLoc(idx)} style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600 }}>Review Courses List</span>
+                      {expandedLocs[idx] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                   </button>
+                   {expandedLocs[idx] && (
+                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                         {Array.isArray(loc.schedule) ? loc.schedule.map((c, i) => (
+                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', marginTop: '4px' }}>
+                              <span>{c.day} @ {c.time}</span>
+                              <strong style={{ textAlign: 'right' }}>{c.course}</strong>
+                           </div>
+                         )) : <pre style={{maxHeight:'100px', overflow:'auto'}}>{JSON.stringify(loc.schedule, null, 2)}</pre>}
+                      </div>
+                   )}
+                 </div>
+               )}
+             </div>
+          ))}
+          <button className="btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} onClick={addLocation}>
+            <Plus size={14}/> Add Location
+          </button>
+        </div>
+
         <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
           <button className="btn-primary w-full" onClick={handleSave}>
             {saved ? 'Saved!' : 'Save Profile Changes'}
@@ -440,34 +624,32 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           <button className="btn-secondary" style={{ flex: 1 }} onClick={handleExportJSON}>
             <Download size={18} /> Export Schedule
           </button>
-
-          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => fileInputRef.current.click()}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => handleImportWithChoice("Import Schedule", handleImportJSON, handleImportJSON)}>
             <Upload size={18} /> Import Schedule
           </button>
-          <input
-            type="file"
-            accept=".json"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handleImportJSON}
-          />
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '0.5rem' }}>
           <button className="btn-secondary" style={{ flex: 1 }} onClick={handleExportLogs}>
-            <Download size={18} /> Export Logs
+            <Download size={18} /> Export Logs  
           </button>
-
-          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => logsInputRef.current.click()}>
+          <button className="btn-secondary" style={{ flex: 1 }} onClick={() => handleImportWithChoice("Import Logs", handleImportLogs, handleImportLogs)}>
             <Upload size={18} /> Import Logs
           </button>
-          <input
-            type="file"
-            accept=".json"
-            ref={logsInputRef}
-            style={{ display: 'none' }}
-            onChange={handleImportLogs}
-          />
+        </div>
+
+        <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>Account Backup</h3>
+        <p style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          Export your entire account into a unified file (Settings, Logs, Schedule, Coach Data). Use this to migrate to another device.
+        </p>
+
+        <div style={{ display: 'flex', gap: '1rem', gridColumn: '1 / -1' }}>
+          <button className="btn-primary" style={{ flex: 1, backgroundColor: '#3b82f6', color: 'white' }} onClick={handleExportAccount}>
+            <Download size={18} /> Export Full Account
+          </button>
+          <button className="btn-primary" style={{ flex: 1, backgroundColor: '#b91c1c', color: 'white' }} onClick={() => handleImportWithChoice("Restore Account", handleImportAccount, handleImportAccount)}>
+            <Upload size={18} /> Restore Account
+          </button>
         </div>
       </div>
     </div>
