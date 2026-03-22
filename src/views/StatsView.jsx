@@ -13,6 +13,27 @@ function parseMins(log) {
 
 const TYPE_COLORS = { Boxing: '#ef4444', Running: '#3b82f6', Strength: '#f59e0b', Recovery: '#10b981' };
 
+function parsePaceToMins(paceStr) {
+  if (!paceStr || typeof paceStr !== 'string') return null;
+  const parts = paceStr.split(':');
+  if (parts.length === 2) {
+    return parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+  }
+  return parseFloat(paceStr) || null;
+}
+
+function parseDistance(distStr) {
+  if (!distStr) return null;
+  return parseFloat(String(distStr).replace(',', '.')) || null;
+}
+
+function formatPace(mins) {
+  if (!mins) return '-';
+  const m = Math.floor(mins);
+  const s = Math.round((mins - m) * 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function StatsView({ logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
   const [activeTab, setActiveTab] = useState('overview');
@@ -106,6 +127,23 @@ export function StatsView({ logs, setLogs }) {
     });
   }
 
+  // ─── Running Analytics ───────────────────────────────────────────────────────
+  const runningLogs = logs
+    .filter(l => l.type === 'Running' && (l.distance || l.pace))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const runningData = runningLogs.map(log => ({
+    date: log.date.substring(5),
+    distance: parseDistance(log.distance),
+    pace: parsePaceToMins(log.pace),
+    displayPace: log.pace
+  }));
+
+  const totalRunningDist = runningData.reduce((acc, d) => acc + (d.distance || 0), 0).toFixed(1);
+  const runsWithPace = runningData.filter(d => d.pace);
+  const avgRunningPaceRaw = runsWithPace.length > 0 ? runsWithPace.reduce((acc, d) => acc + d.pace, 0) / runsWithPace.length : 0;
+  const avgRunningPace = formatPace(avgRunningPaceRaw);
+
   const handleDeleteLog = (id) => {
     showConfirm('Elimina Sessione', 'Sei sicuro di voler eliminare questa sessione?', () => {
       setLogs(logs.filter(l => l.id !== id));
@@ -170,6 +208,7 @@ export function StatsView({ logs, setLogs }) {
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <TabBtn id="overview" label="Overview" />
         <TabBtn id="load" label="Weekly Load" />
+        <TabBtn id="running" label="Running 🏃" />
         <TabBtn id="boxscore" label="By Type" />
         <TabBtn id="records" label="Records 🏆" />
         <TabBtn id="heatmap" label="Heatmap" />
@@ -259,6 +298,68 @@ export function StatsView({ logs, setLogs }) {
                     <Legend />
                     <Line yAxisId="left" type="monotone" dataKey="sleep" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Hours" />
                     <Line yAxisId="right" type="monotone" dataKey="quality" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Quality (1-10)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Running Analytics ── */}
+      {activeTab === 'running' && (
+        <>
+          <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+            <div className="stat-card running">
+              <div className="stat-value">{totalRunningDist}km</div>
+              <div className="stat-label">Total Distance</div>
+            </div>
+            <div className="stat-card running" style={{ borderBottom: '4px solid #3b82f6' }}>
+              <div className="stat-value">{avgRunningPace}</div>
+              <div className="stat-label">Avg Pace (min/km)</div>
+            </div>
+            <div className="stat-card running">
+              <div className="stat-value">{runningLogs.length}</div>
+              <div className="stat-label">Runs</div>
+            </div>
+          </div>
+
+          <div className="chart-container card">
+            <h3 className="section-title">Distance Trend (km)</h3>
+            {runningData.filter(d => d.distance).length < 2 ? (
+              <div className="empty-state">Log at least 2 runs with distance data.</div>
+            ) : (
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={runningData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis stroke="var(--text-muted)" fontSize={11} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    <Bar dataKey="distance" name="Distance (km)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="chart-container card" style={{ marginTop: '1rem' }}>
+            <h3 className="section-title">Pace Trend (min/km)</h3>
+            {runningData.filter(d => d.pace).length < 2 ? (
+              <div className="empty-state">Log at least 2 runs with pace data (M:SS).</div>
+            ) : (
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={runningData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis reversed domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={11} tickFormatter={formatPace} />
+                    <Tooltip 
+                      formatter={(v) => formatPace(v)}
+                      contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="pace" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} name="Pace" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

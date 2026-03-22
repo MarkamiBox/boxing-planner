@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain } from 'lucide-react';
+import { calculateDuration } from '../utils';
 import './logger.css';
 
 export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext }) {
@@ -8,21 +9,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   const recentLogWithWeight = logs?.find(l => l.bodyWeight);
   const recentLogWithSleep = logs?.find(l => l.sleepHours || l.sleepQuality);
 
-  const calculateDuration = (workout) => {
-    if (!workout || !workout.steps) return '';
-    if (workout.timerStats?.actualDuration) {
-      return Math.round(workout.timerStats.actualDuration / 60) + '';
-    }
-    let totalSec = 0;
-    workout.steps.forEach(s => {
-      let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
-      if(s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
-      else if(s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
-      else if(s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
-      else if(s.type === 'text') totalSec += Number(s.duration || 0) + prep;
-    });
-    return totalSec > 0 ? String(Math.round(totalSec / 60)) : '';
-  };
+  // calculateDuration imported from utils
 
   const [date, setDate] = useState(getTodayDate());
   const [type, setType] = useState(activeWorkout ? activeWorkout.type : 'Boxing');
@@ -30,7 +17,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     const d = new Date();
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   });
-  const [durationStr, setDurationStr] = useState(activeWorkout ? calculateDuration(activeWorkout) : '');
+  const [durationStr, setDurationStr] = useState(activeWorkout ? String(calculateDuration(activeWorkout)) : '');
 
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);
@@ -69,7 +56,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     if (activeWorkout) {
       setType(activeWorkout.type);
       setNotes(`Completed: ${activeWorkout.name}`);
-      setDurationStr(calculateDuration(activeWorkout));
+      setDurationStr(String(calculateDuration(activeWorkout)));
     }
   }, [activeWorkout]);
 

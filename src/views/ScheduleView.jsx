@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle } from 'lucide-react';
+import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
-import { getTodayDayName, getWeekId } from '../utils';
+import { getTodayDayName, getWeekId, calculateDuration } from '../utils';
 import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
@@ -19,6 +19,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
 
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [] });
+  const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
 
   // JSON Import state
   const [jsonImport, setJsonImport] = useState({ open: false, text: '', error: '' });
@@ -27,7 +28,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   const swipeStartX = useRef(null);
 
   const parseWeek = (wId) => {
-    if(!wId) return { y: new Date().getFullYear(), w: 1 };
+    if (!wId) return { y: new Date().getFullYear(), w: 1 };
     const [y, w] = wId.split('-W');
     return { y: parseInt(y), w: parseInt(w) };
   };
@@ -42,10 +43,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     const ISOweekStart = simple;
     if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
     else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-    
+
     const end = new Date(ISOweekStart);
     end.setDate(end.getDate() + 6);
-    
+
     const format = (d) => d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
     return `${format(ISOweekStart)} al ${format(end)}`;
   };
@@ -57,9 +58,9 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     let newW = w + direction;
     if (newW > 52) { newW = 1; newY++; }
     if (newW < 1) { newW = 52; newY--; }
-    
+
     const newId = getWeekString(newY, newW);
-    
+
     // Auto-clone if new week is empty
     if (!weeks[newId]) {
       const cloned = JSON.parse(JSON.stringify(schedule));
@@ -77,7 +78,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     if (ex) {
       ex.done = !ex.done;
       setSchedule(newSchedule);
-      
+
       const sessionOriginId = `${currentWeekId}-${day}-${exerciseId}`;
 
       if (ex.done) {
@@ -105,12 +106,12 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
 
   const startEdit = (exercise) => {
     setEditingId(exercise.id);
-    setEditForm({ 
-      name: exercise.name, 
-      type: exercise.type, 
+    setEditForm({
+      name: exercise.name,
+      type: exercise.type,
       notes: exercise.notes || '',
       plannedTime: exercise.plannedTime || '',
-      steps: exercise.steps ? JSON.parse(JSON.stringify(exercise.steps)) : [] 
+      steps: exercise.steps ? JSON.parse(JSON.stringify(exercise.steps)) : []
     });
   };
 
@@ -166,6 +167,33 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     startEdit({ id: newId, type: 'Boxing', name: 'New Exercise', notes: '', plannedTime: '', steps: [] });
   };
 
+  const handleCloneLastWeek = () => {
+    const { y, w } = parseWeek(currentWeekId);
+    let newY = y; let newW = w - 1;
+    if (newW < 1) { newW = 52; newY--; }
+    const prevWeekId = getWeekString(newY, newW);
+    const prevSchedule = weeks[prevWeekId];
+    if (prevSchedule) {
+      const cloned = JSON.parse(JSON.stringify(prevSchedule));
+      Object.keys(cloned).forEach(d => cloned[d].forEach(ex => ex.done = false));
+      setSchedule(cloned);
+      setWeeks({ ...weeks, [currentWeekId]: cloned });
+      showAlert('Successo', `Settimana ${prevWeekId} clonata con successo in ${currentWeekId}.`);
+    } else {
+      showAlert('Errore', `Nessuna programmazione trovata per la settimana ${prevWeekId}.`);
+    }
+    setCloneMenuOpen(false);
+  };
+  
+  const handleClearWeek = () => {
+    showConfirm('Pulisci Settimana', "Sei sicuro di voler svuotare l'intera settimana?", () => {
+      const blank = { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+      setSchedule(blank);
+      setWeeks({ ...weeks, [currentWeekId]: blank });
+    });
+    setCloneMenuOpen(false);
+  };
+
   // ── JSON Import ──────────────────────────────────────────────────────────────
   const openJsonImport = () => setJsonImport({ open: true, text: '', error: '' });
   const closeJsonImport = () => setJsonImport({ open: false, text: '', error: '' });
@@ -205,7 +233,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
     setSchedule(newSchedule);
     closeJsonImport();
-    showAlert('Import OK', `${normalised.length} esercizio/i aggiunto/i a ${activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}.`);
+    showAlert('Import OK', `${ normalised.length } esercizio / i aggiunto / i a ${ activeDay.charAt(0).toUpperCase() + activeDay.slice(1) }.`);
   };
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -320,15 +348,28 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     return { done, total: exs.length };
   };
 
+  const getDayTotalDuration = () => {
+    let totalMins = 0;
+    activeExercises.forEach(ex => {
+      totalMins += calculateDuration(ex);
+    });
+    if (totalMins === 0) return null;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h > 0) return `~${h}h ${m}min total`;
+    return `~${m}min total`;
+  };
+
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${ m.toString().padStart(2, '0') }: ${ s.toString().padStart(2, '0') }`;
   };
 
   const formatStepDescription = (step) => {
-    if (step.type === 'timer' || step.type === 'manual_timer') return `${formatTime(step.duration)} \u231A`;
-    if (step.type === 'interval') return `${step.rounds} Rnd x ${formatTime(step.work)} / ${formatTime(step.rest)}`;
+    if (step.type === 'timer' || step.type === 'manual_timer') return `${ formatTime(step.duration)
+    } \u231A`;
+    if (step.type === 'interval') return `${ step.rounds } Rnd x ${ formatTime(step.work) } / ${formatTime(step.rest)}`;
     if (step.type === 'sets') return `${step.sets} Set x ${step.reps} (Rest: ${formatTime(step.rest)})`;
     return '\uD83D\uDCDD';
   };
@@ -339,11 +380,22 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         <h1 className="page-title">Schedule</h1>
         {currentWeekId && (
           <div className="week-nav">
-            <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20}/></button>
-            <span className="week-range-text">
-              {getWeekDateRange(currentWeekId)}
-            </span>
-            <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20}/></button>
+            <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20} /></button>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span className="week-range-text">
+                {getWeekDateRange(currentWeekId)}
+              </span>
+              <button className="btn-text" style={{ padding: '2px 4px', marginLeft: '4px', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setCloneMenuOpen(!cloneMenuOpen)}>
+                <ChevronDown size={16} />
+              </button>
+              {cloneMenuOpen && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.25rem', zIndex: 100, minWidth: '160px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', marginTop: '4px' }}>
+                  <button onClick={handleCloneLastWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><Copy size={14} style={{ marginRight: '6px' }} /> Clone last week</button>
+                  <button onClick={handleClearWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--primary)', fontSize: '0.85rem' }}><Trash2 size={14} style={{ marginRight: '6px' }} /> Start blank</button>
+                </div>
+              )}
+            </div>
+            <button className="btn-icon" onClick={() => changeWeek(1)} style={{ padding: '2px' }}><ChevronRight size={20} /></button>
           </div>
         )}
       </div>
@@ -373,7 +425,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
         onTouchEnd={handleTouchEnd}
       >
         <div className="list-header">
-          <h2>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}'s Session</h2>
+          <div>
+            <h2>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}'s Session</h2>
+            {getDayTotalDuration() && <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '2px' }}>{getDayTotalDuration()}</div>}
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button className="btn-icon import-json-btn" title="Import exercises from JSON" onClick={openJsonImport}>
               <FileCode2 size={18} />
@@ -392,31 +447,31 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
               {editingId === ex.id ? (
                 <div className="exercise-editor">
                   <div className="editor-row">
-                    <input 
-                      type="text" 
-                      value={editForm.name} 
-                      onChange={e => setEditForm({...editForm, name: e.target.value})}
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                       placeholder="Exercise Name"
                     />
-                    <select 
-                      value={editForm.type} 
-                      onChange={e => setEditForm({...editForm, type: e.target.value})}
+                    <select
+                      value={editForm.type}
+                      onChange={e => setEditForm({ ...editForm, type: e.target.value })}
                     >
                       <option value="Boxing">Boxing</option>
                       <option value="Strength">Strength</option>
                       <option value="Running">Running</option>
                       <option value="Recovery">Recovery</option>
                     </select>
-                    <input 
-                      type="time" 
-                      value={editForm.plannedTime || ''} 
-                      onChange={e => setEditForm({...editForm, plannedTime: e.target.value})}
+                    <input
+                      type="time"
+                      value={editForm.plannedTime || ''}
+                      onChange={e => setEditForm({ ...editForm, plannedTime: e.target.value })}
                       style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', minWidth: '80px' }}
                     />
                   </div>
-                  <textarea 
-                    value={editForm.notes} 
-                    onChange={e => setEditForm({...editForm, notes: e.target.value})}
+                  <textarea
+                    value={editForm.notes}
+                    onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
                     placeholder="General Notes"
                     rows="2"
                     style={{ marginBottom: '1rem' }}
@@ -425,8 +480,8 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                   {/* Guided Steps Builder */}
                   <div className="steps-builder">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                       <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>Guided Steps Playlist</label>
-                       <button className="btn-text" onClick={addStep} style={{ fontSize: '0.8rem', padding: '0', color: 'var(--primary)' }}>+ Add Step</button>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>Guided Steps Playlist</label>
+                      <button className="btn-text" onClick={addStep} style={{ fontSize: '0.8rem', padding: '0', color: 'var(--primary)' }}>+ Add Step</button>
                     </div>
                     {editForm.steps.map((step, idx) => renderStepEditor(step, idx))}
                     {editForm.steps.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No guided steps. Timer will not be available for this exercise.</p>}
@@ -448,9 +503,9 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
               ) : (
                 <div className="exercise-content">
                   <label className="checkbox-container">
-                    <input 
-                      type="checkbox" 
-                      checked={ex.done} 
+                    <input
+                      type="checkbox"
+                      checked={ex.done}
                       onChange={() => toggleDone(activeDay, ex.id)}
                     />
                     <span className="checkmark"></span>
@@ -459,21 +514,22 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                     <div className="ex-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span className={`tag ${ex.type.toLowerCase()}`}>{ex.type}</span>
                       <h3 style={{ margin: 0 }}>{ex.name}</h3>
+                      {calculateDuration(ex) > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>~{calculateDuration(ex)} min</span>}
                       {ex.plannedTime && <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(185, 28, 28, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>🕒 {ex.plannedTime}</span>}
                     </div>
                     {ex.notes && <p className="ex-notes" style={{ whiteSpace: 'pre-line' }}>{ex.notes}</p>}
-                    
+
                     {ex.steps && ex.steps.length > 0 && (
                       <div style={{ marginTop: '0.5rem' }}>
-                        <button 
-                          className="btn-text" 
+                        <button
+                          className="btn-text"
                           style={{ padding: '0', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer' }}
                           onClick={() => setExpandedId(expandedId === ex.id ? null : ex.id)}
                         >
                           {expandedId === ex.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           {ex.steps.length} Guided Steps
                         </button>
-                        
+
                         {expandedId === ex.id && (
                           <div className="steps-list" style={{ marginTop: '0.75rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-color)' }}>
                             {ex.steps.map((step, idx) => (
@@ -494,8 +550,8 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {ex.steps && ex.steps.length > 0 && (
-                      <button 
-                        className="btn-icon" 
+                      <button
+                        className="btn-icon"
                         style={{ backgroundColor: 'var(--primary)', color: 'white', borderColor: 'var(--primary)' }}
                         onClick={() => {
                           setActiveWorkout({ ...ex, sourceDay: activeDay });
@@ -508,23 +564,23 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                     <button className="btn-icon edit-btn" onClick={() => startEdit(ex)}>
                       <Edit2 size={18} />
                     </button>
-                    
+
                     {/* Move up/down */}
                     {exIdx > 0 && (
                       <button className="btn-icon" style={{ padding: '4px', opacity: 0.6, fontSize: '0.7rem' }} title="Move Up" onClick={() => moveExercise(activeDay, exIdx, -1)}>
-                        <ChevronUp size={15}/>
+                        <ChevronUp size={15} />
                       </button>
                     )}
                     {exIdx < activeExercises.length - 1 && (
                       <button className="btn-icon" style={{ padding: '4px', opacity: 0.6, fontSize: '0.7rem' }} title="Move Down" onClick={() => moveExercise(activeDay, exIdx, 1)}>
-                        <ChevronDown size={15}/>
+                        <ChevronDown size={15} />
                       </button>
                     )}
 
                     {/* Copy to day */}
                     <div style={{ position: 'relative' }}>
                       <button className="btn-icon" style={{ padding: '4px', fontSize: '0.7rem' }} title="Copy to another day" onClick={() => setCopyPickerFor(copyPickerFor === ex.id ? null : ex.id)}>
-                        <Plus size={15}/>
+                        <Plus size={15} />
                       </button>
                       {copyPickerFor === ex.id && (
                         <div style={{ position: 'absolute', right: '100%', top: 0, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.5rem', zIndex: 50, minWidth: '90px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>

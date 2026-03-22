@@ -399,7 +399,13 @@ Technical Levels (1-5):
   Defense: ${profile.levels.defense} | Jab: ${profile.levels.jab} | Ring IQ: ${profile.levels.reading}
 
 Locations & Equipment:
-${profile.locations && profile.locations.length > 0 ? profile.locations.map(l => `  - ${l.name}: ${l.equipment}`).join('\n') : '  None specified.'}
+${profile.locations && profile.locations.length > 0 ? profile.locations.map(l => {
+  let text = '  - ' + l.name + ': ' + l.equipment;
+  if (l.schedule && l.schedule.length > 0) {
+    text += ' (Schedule: ' + JSON.stringify(l.schedule) + ')';
+  }
+  return text;
+}).join('\n') : '  None specified.'}
 
 ═══ CURRENT STATE ═══
 Recent averages (${recentLogs.length} sessions): Energy ${avgEnergy}/10, Cardio ${avgCardio}/10, Focus ${avgFocus}/10

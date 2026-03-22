@@ -30,3 +30,22 @@ export function formatTime(seconds) {
   const s = seconds % 60;
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
+
+/**
+ * Calculates the estimated total duration in minutes of an exercise
+ */
+export function calculateDuration(workout) {
+  if (!workout || !workout.steps) return 0;
+  if (workout.timerStats?.actualDuration) {
+    return Math.round(workout.timerStats.actualDuration / 60);
+  }
+  let totalSec = 0;
+  workout.steps.forEach(s => {
+    let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
+    if(s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
+    else if(s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
+    else if(s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
+    else if(s.type === 'text') totalSec += Number(s.duration || 0) + prep;
+  });
+  return totalSec > 0 ? Math.round(totalSec / 60) : 0;
+}
