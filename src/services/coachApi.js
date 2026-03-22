@@ -348,17 +348,18 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
   const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const todayDayNum = new Date().getDay(); // 0=Sun, 4=Thu, 5=Fri, 6=Sat
 
-  const recentLogs = (logs || []).filter(l => l.energy > 0).slice(0, 5);
+  const recentLogs = (logs || []).filter(l => l.energy > 0).slice(0, 10);
 
   const avg = (arr, key) => arr.length > 0 ? (arr.reduce((a, l) => a + (l[key] || 0), 0) / arr.length).toFixed(1) : '-';
   const avgEnergy = avg(recentLogs, 'energy');
   const avgCardio = avg(recentLogs, 'cardio');
   const avgFocus = avg(recentLogs.filter(l => l.focus > 0), 'focus');
 
-  const withSleep = recentLogs.filter(l => l.sleepHours);
+  const withSleep = (logs || []).filter(l => l.sleepHours).slice(0, 7);
   const avgSleep = withSleep.length > 0 ? (withSleep.slice(0, 7).reduce((a, l) => a + l.sleepHours, 0) / Math.min(withSleep.length, 7)).toFixed(1) : null;
   const lastWeight = (logs || []).find(l => l.bodyWeight)?.bodyWeight || null;
   const lastSoreness = recentLogs.length > 0 ? recentLogs[0].musclesSoreness : null;
+  const recentSoreness = recentLogs.slice(0, 3).map(l => l.musclesSoreness).filter(Boolean);
   const lastSleep = withSleep.length > 0 ? withSleep[0].sleepHours : null;
 
   // Fatigue signal: last 2 sessions both low energy
@@ -392,6 +393,8 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
     if (log.skippedSteps > 0) line += ` | Skipped ${log.skippedSteps} steps`;
     if (log.musclesSoreness) line += ` | Soreness:${log.musclesSoreness}/10`;
     if (log.sleepHours) line += ` | Sleep:${log.sleepHours}h (quality:${log.sleepQuality}/10)`;
+    if (log.sparringRounds > 0) line += ` | Sparring:${log.sparringRounds}rnd (gas tank drop:${log.lastRoundDrop}/10)`;
+    if (log.distance) line += ` | Distance:${log.distance} Pace:${log.pace || '-'} Time:${log.time || '-'}`;
     if (log.notes) line += ` | "${log.notes}"`;
     return line;
   }).join('\n');
@@ -401,7 +404,11 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
   if (consecutiveLowEnergy) smartFlags.push('⚠️ FATIGUE ALERT: Last 2 sessions both ≤5/10 energy — consider reducing this week\'s intensity.');
   if (lastSoreness >= 8) smartFlags.push('⚠️ HIGH SORENESS: Last session soreness was ' + lastSoreness + '/10 — consider a recovery day swap today.');
   if (lastSleep !== null && lastSleep < 6) smartFlags.push('⚠️ SLEEP DEFICIT: Last night was only ' + lastSleep + 'h — reduce intensity for today\'s session.');
-  if (todayDayNum >= 4) smartFlags.push('📅 END OF WEEK: It\'s ' + todayDay + ' — good time to review this week and plan next week if needed.');
+  if (todayDayNum === 5 || todayDayNum === 6 || todayDayNum === 0) smartFlags.push('📅 END OF WEEK: It\'s ' + todayDay + ' — good time to review this week and plan next week if needed.');
+
+  const weekDoneCount = Object.values(schedule || {}).flat().filter(e => e.done).length;
+  const weekTotalCount = Object.values(schedule || {}).flat().length;
+  const weekCompletionLine = weekTotalCount > 0 ? `Completion this week: ${weekDoneCount}/${weekTotalCount} exercises done` : '';
 
   return `You are an expert boxing coach embedded inside the athlete's training app. You speak the same language as the athlete (Italian if they write in Italian, English if they write in English). Be direct and act like a real coach — not an assistant.
 
@@ -415,7 +422,7 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
 7. GOALS: Always consider the user's short/long-term goals when planning, even if they have no specific target date.
 8. STRETCHING: Always include a 'Recovery' exercise or 'text' steps at the end of workouts with contextual stretching targeting the specific muscles used that day.
 9. LOCATIONS: If the user has defined training locations/equipment, plan workouts strictly based on the equipment available at their chosen location.
-11. TIMING: Always set the 'plannedTime' field in HH:mm format (e.g. "17:30"). Never omit it if a specific time is mentioned. Orario sugerito: "specifica mattina, pomeriggio o sera se non hai orario preciso".
+11. TIMING: Always set the 'plannedTime' field in HH:mm format (e.g. "17:30"). Never omit it if a specific time is mentioned. If no exact time is given, use a reasonable default based on context (morning session → "09:00", afternoon → "16:00", evening → "19:00").
 12. GYM vs HOME:
     - iGym / Orbean: These locations have FIXED course schedules. If the athlete mentions a course at these locations, DO NOT attempt to "structure" or "add steps" to it beyond simple placeholders. It is a fixed group class.
     - Home / Parco: No scheduled courses here. You ARE responsible for providing a detailed, structured workout with steps.
@@ -459,13 +466,15 @@ ${profile.locations && profile.locations.length > 0 ? profile.locations.map(l =>
 ═══ CURRENT STATE ═══
 Recent averages (${recentLogs.length} sessions): Energy ${avgEnergy}/10, Cardio ${avgCardio}/10, Focus ${avgFocus}/10
 ${avgSleep ? `Avg sleep: ${avgSleep}h/night` : ''}
-${lastSoreness !== null ? `Last soreness: ${lastSoreness}/10` : ''}
+${recentSoreness.length > 0 ? `Soreness trend (last ${recentSoreness.length}): ${recentSoreness.join(' → ')}/10` : ''}
 ${lastWeight ? `Last weight: ${lastWeight}kg` : ''}
+${(() => { const withSkips = recentLogs.filter(l => l.skippedSteps > 0); return withSkips.length > 0 ? `Timer discipline: ${withSkips.length}/${recentLogs.length} recent sessions had skipped steps` : ''; })()}
 
 ═══ ACTIVE GOALS ═══
 ${goalsText}
 
 ═══ THIS WEEK'S SCHEDULE (${currentWeekId}) ═══
+${weekCompletionLine}
 ${scheduleText}
 
 ═══ RECENT SESSION HISTORY ═══
