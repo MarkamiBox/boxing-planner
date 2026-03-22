@@ -361,31 +361,86 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   };
 
   const previousStep = () => {
+    delete timerRef.current.expectedEndTime;
+
     if (!isGuided) {
       // Manual timer: go back one phase
       if (phase === 'rest') {
         setPhase('work');
         setTimeLeft(work);
-        delete timerRef.current.expectedEndTime;
       } else if (phase === 'work' && currentRound > 1) {
         setPhase('rest');
         setTimeLeft(rest);
         setCurrentRound(r => r - 1);
-        delete timerRef.current.expectedEndTime;
-      } else if (phase === 'work' || phase === 'prep') {
+      } else {
         setPhase('stopped');
         setIsRunning(false);
-        setTimeLeft(0);
+        setTimeLeft(work);
         setCurrentRound(1);
-        delete timerRef.current.expectedEndTime;
       }
       return;
     }
-    if (currentStepIdx === 0) return;
+
+    // 2. Handle Phase granularity within the current step
+    if (currentStep.type === 'interval') {
+      if (phase === 'rest') {
+        setPhase('work');
+        setTimeLeft(currentStep.work);
+        return;
+      } else if (phase === 'work' && currentRound > 1) {
+        setPhase('rest');
+        setTimeLeft(currentStep.rest);
+        setCurrentRound(r => r - 1);
+        return;
+      } else if (phase === 'work' && currentRound === 1) {
+        // Go back to Prep phase if this is the start of the interval 
+        const stepPrep = getStepPrepTime(currentStep);
+        if (phase !== 'prep' && stepPrep > 0) {
+           setPhase('prep');
+           setTimeLeft(stepPrep);
+           return;
+        }
+      }
+    } else if (currentStep.type === 'timer' || currentStep.type === 'manual_timer') {
+      const stepPrep = getStepPrepTime(currentStep);
+      if (phase === 'work' && stepPrep > 0) {
+        setPhase('prep');
+        setTimeLeft(stepPrep);
+        return;
+      }
+    }
+
+    // 3. Move to the PREVIOUS Step (Exercise)
+    if (currentStepIdx === 0) {
+      // At the very first exercise, just reset it
+      setPhase('stopped');
+      setIsRunning(false);
+      prepareGuidedStep(currentStep);
+      return;
+    }
+
     statsTracker.current.skippedSteps = Math.max(0, statsTracker.current.skippedSteps - 1);
-    const prevStep = activeWorkout.steps[currentStepIdx - 1];
-    setCurrentStepIdx(prev => prev - 1);
-    prepareGuidedStep(prevStep);
+    const prevStepIdx = currentStepIdx - 1;
+    const prevStep = activeWorkout.steps[prevStepIdx];
+    
+    setCurrentStepIdx(prevStepIdx);
+    delete timerRef.current.expectedEndTime;
+    setIsRunning(false);
+
+    // Jump into the END of the previous step
+    if (prevStep.type === 'interval') {
+      setCurrentRound(prevStep.rounds);
+      setPhase('work');
+      setTimeLeft(prevStep.work);
+    } else if (prevStep.type === 'sets') {
+      setCurrentRound(prevStep.sets);
+      setPhase('stopped');
+      setTimeLeft(0);
+    } else {
+      setCurrentRound(1);
+      setPhase('work');
+      setTimeLeft(prevStep.duration || 0);
+    }
   };
 
   const getPhaseColor = () => {
