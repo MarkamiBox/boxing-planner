@@ -139,7 +139,7 @@ export function CoachView({
         ...keys,
         activeProvider: activeProvider || 'anthropic',
         apiKey: activeKey,
-        model: coachSettings.model || 'claude-haiku-4-5-20251001'
+        model: coachSettings.model || 'claude-3-5-sonnet-20241022'
       });
       setShowSettings(false);
     };
@@ -173,19 +173,27 @@ export function CoachView({
     );
   }
 
+  useEffect(() => {
+    setError(''); // Clear errors when switching convs
+  }, [activeConvId]);
+
+  const deleteConversation = (id) => {
+    showConfirm('Sei sicuro?', 'Vuoi davvero eliminare questa conversazione?', () => {
+      const newConvs = coachConversations.filter(c => c.id !== id);
+      setCoachConversations(newConvs);
+      if (activeConvId === id) {
+        const remaining = newConvs.length > 0 ? newConvs[0].id : null;
+        setActiveConvId(remaining);
+      }
+    });
+  };
+
   const createNewConversation = () => {
     const newConv = { id: Date.now().toString(), title: `Session ${new Date().toLocaleDateString('it-IT')}`, createdAt: new Date().toISOString(), messages: [] };
     setCoachConversations([newConv, ...coachConversations]);
     setActiveConvId(newConv.id);
     setStreamingText('');
     setError('');
-  };
-
-  const deleteConversation = (convId) => {
-    showConfirm('Delete Conversation', 'Are you sure?', () => {
-      setCoachConversations(coachConversations.filter(c => c.id !== convId));
-      if (activeConvId === convId) setActiveConvId(coachConversations.find(c => c.id !== convId)?.id || null);
-    });
   };
 
   if (coachConversations.length === 0 || (!activeConvId && coachConversations.length > 0)) {
@@ -451,23 +459,33 @@ export function CoachView({
       <div className="coach-header">
         <div className="coach-conv-selector">
           <h1 className="page-title" style={{ margin: 0, fontSize: '1.1rem' }}>Coach</h1>
-          {coachConversations.length > 1 && (
-            <select value={activeConvId || ''} onChange={e => setActiveConvId(e.target.value)} style={{ maxWidth: '120px', fontSize: '0.8rem' }}>
-              {coachConversations.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-            </select>
+          {coachConversations.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <select value={activeConvId || ''} onChange={e => setActiveConvId(e.target.value)} style={{ maxWidth: '120px', fontSize: '0.8rem' }}>
+                {coachConversations.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+              <button className="btn-icon danger" onClick={() => deleteConversation(activeConvId)} title="Elimina conversazione">
+                <Trash2 size={14} />
+              </button>
+            </div>
           )}
         </div>
         <div className="coach-header-actions">
-            <select className="coach-provider-select" value={coachSettings.activeProvider} style={{ fontSize: '0.75rem', padding: '2px 4px' }} onChange={e => {
-             const p = e.target.value;
-             const k = p === 'anthropic' ? (coachSettings.anthropicKey || '') : p === 'google' ? (coachSettings.googleKey || '') : (coachSettings.openrouterKey || '');
-             setCoachSettings({ 
-               ...coachSettings, 
-               activeProvider: p, 
-               apiKey: k, 
-               model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022' 
-             });
-           }}>
+           <select 
+             className="coach-provider-select" 
+             value={coachSettings.activeProvider} 
+             style={{ fontSize: '0.75rem', padding: '2px 4px' }} 
+             onChange={e => {
+               const p = e.target.value;
+               const k = p === 'anthropic' ? (coachSettings.anthropicKey || '') : p === 'google' ? (coachSettings.googleKey || '') : (coachSettings.openrouterKey || '');
+               setCoachSettings({ 
+                 ...coachSettings, 
+                 activeProvider: p, 
+                 apiKey: k, 
+                 model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022' 
+               });
+             }}
+           >
              <option value="anthropic">Anthropic</option>
              <option value="google">Google</option>
              <option value="openrouter">OpenRouter</option>
@@ -513,6 +531,7 @@ export function CoachView({
         </div>
       </div>
 
+
       <div className="coach-messages">
         {messages.map((msg, idx) => (
           <div key={idx} className={`coach-msg ${msg.role}`}>
@@ -529,7 +548,16 @@ export function CoachView({
         ))}
         {streamingText && <div className="coach-msg assistant">{renderMarkdown(streamingText)}</div>}
         {isLoading && !streamingText && <div className="coach-typing"><span className="dot"/><span className="dot"/><span className="dot"/></div>}
-        {error && <div className="coach-error">{error}</div>}
+        {error && (
+          <div className="coach-msg system error">
+            <div className="error-icon">⚠️</div>
+            <div className="error-content">
+              <strong>Si è verificato un errore:</strong>
+              <p>{error}</p>
+              <button className="btn-text" style={{ fontSize: '0.8rem', padding: '0', marginTop: '4px' }} onClick={() => handleSend()}>Riprova</button>
+            </div>
+          </div>
+        )}
 
         {pendingTools && pendingTools.convId === activeConvId && (
           <div className="coach-approval-card detailed">

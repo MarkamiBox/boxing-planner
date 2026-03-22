@@ -602,6 +602,41 @@
   height: 4px;
 }
 
+.coach-msg.system.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  display: flex !important;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 0.75rem;
+  animation: slideUp 0.3s ease-out;
+}
+
+.coach-msg.system.error .error-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.coach-msg.system.error .error-content {
+  flex: 1;
+}
+
+.coach-msg.system.error .error-content strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #ef4444;
+}
+
+.coach-msg.system.error .error-content p {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
 .indicator {
   width: 4px;
   height: 4px;
