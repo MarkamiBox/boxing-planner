@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Copy, Save, Check, Download, Upload, Plus, Trash2, Target, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { get, set, keys as idbKeys } from 'idb-keyval';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
@@ -204,13 +205,13 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     }
   };
 
-  const handleExportAccount = () => {
+  const handleExportAccount = async () => {
     const data = {};
-    for (let i = 0; i < window.localStorage.length; i++) {
-       const key = window.localStorage.key(i);
+    const allKeys = await idbKeys();
+    for (const key of allKeys) {
        if (key && key.startsWith('bxng_')) {
           try {
-            data[key] = JSON.parse(window.localStorage.getItem(key));
+            data[key] = await get(key);
           } catch(e) {}
        }
     }
@@ -221,12 +222,14 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     try {
       const data = JSON.parse(text);
       if (!data.bxng_profile) throw new Error("Invalid format");
-      showConfirm("Restore Account", "This will overwrite your ENTIRE account data (logs, schedule, profile). Are you sure?", () => {
+      showConfirm("Restore Account", "This will overwrite your ENTIRE account data (logs, schedule, profile). Are you sure?", async () => {
+         const promises = [];
          Object.keys(data).forEach(key => {
             if (key.startsWith('bxng_')) {
-               window.localStorage.setItem(key, JSON.stringify(data[key]));
+               promises.push(set(key, data[key]));
             }
          });
+         await Promise.all(promises);
          window.location.reload(); 
       });
     } catch(e) {

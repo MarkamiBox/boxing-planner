@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { get, set, keys } from 'idb-keyval';
 import { getWeekId } from '../utils';
 
 const APP_VERSION = 'v5'; // Update Presets
@@ -136,48 +137,114 @@ const initialSchedule = {
 
 // getWeekId is now imported from '../utils'
 
+// ─── IDB Context Provider ────────────────────────────────────────────────────────
+
+const AppStateStoreContext = createContext(null);
+
+export function AppStateProvider({ children }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [store, setStore] = useState({});
+
+  useEffect(() => {
+    async function init() {
+       let migrated = window.localStorage.getItem('bxng_migrated_idb');
+       if (!migrated) {
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && key.startsWith('bxng_')) {
+               try { await set(key, JSON.parse(window.localStorage.getItem(key))); } catch(e){}
+            }
+          }
+          window.localStorage.setItem('bxng_migrated_idb', 'true');
+       }
+
+       const dbKeys = await keys();
+       const loaded = {};
+       for (const key of dbKeys) {
+         if (key.startsWith('bxng_')) {
+           loaded[key] = await get(key);
+         }
+       }
+       setStore(loaded);
+       setIsLoaded(true);
+    }
+    init();
+  }, []);
+
+  if (!isLoaded) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🥊</div>
+        <div>Loading AI Database...</div>
+      </div>
+    );
+  }
+
+  return (
+    <AppStateStoreContext.Provider value={{ store, setStore }}>
+      {children}
+    </AppStateStoreContext.Provider>
+  );
+}
+
+// ─── IDB Sync Hook ────────────────────────────────────────────────────────────
+
+export function useIdbStorage(key, initialValue) {
+  const ctx = useContext(AppStateStoreContext);
+  if (!ctx) throw new Error("useIdbStorage must be used within AppStateProvider");
+  const { store, setStore } = ctx;
+  
+  const storedValue = store[key] !== undefined ? store[key] : initialValue;
+
+  const setValue = (value) => {
+    const valueToStore = value instanceof Function ? value(storedValue) : value;
+    setStore(prev => ({ ...prev, [key]: valueToStore }));
+    set(key, valueToStore).catch(err => console.error("IDB Save Error", err));
+  };
+  
+  const resetValue = () => {
+    setStore(prev => ({ ...prev, [key]: initialValue }));
+    set(key, initialValue).catch(() => {});
+  };
+
+  return [storedValue, setValue, resetValue];
+}
+
+// ─── App State Aggregation ────────────────────────────────────────────────────
+
 export function useAppState() {
-  const [appVersion, setAppVersion] = useLocalStorage('bxng_app_version', '');
-  const [profile, setProfile, resetProfile] = useLocalStorageWithReset('bxng_profile', initialProfile);
+  const [appVersion, setAppVersion] = useIdbStorage('bxng_app_version', '');
+  const [profile, setProfile, resetProfile] = useIdbStorage('bxng_profile', initialProfile);
   
-  const [weeks, setWeeks] = useLocalStorage('bxng_weeks', null);
-  const [currentWeekId, setCurrentWeekId] = useLocalStorage('bxng_current_week', null);
+  const [weeks, setWeeks] = useIdbStorage('bxng_weeks', null);
+  const [currentWeekId, setCurrentWeekId] = useIdbStorage('bxng_current_week', null);
   
-  const [timerPresets, setTimerPresets, resetTimerPresets] = useLocalStorageWithReset('bxng_timer_presets', initialTimerPresets);
-  const [logs, setLogs] = useLocalStorage('bxng_logs', []);
+  const [timerPresets, setTimerPresets, resetTimerPresets] = useIdbStorage('bxng_timer_presets', initialTimerPresets);
+  const [logs, setLogs] = useIdbStorage('bxng_logs', []);
   const [activeWorkout, setActiveWorkout] = useState(null);
 
-  // Coach system state
-  const [goals, setGoals] = useLocalStorage('bxng_goals', []);
-  const [coachConversations, setCoachConversations] = useLocalStorage('bxng_coach_conversations', []);
-  const [coachMemory, setCoachMemory] = useLocalStorage('bxng_coach_memory', {
+  const [goals, setGoals] = useIdbStorage('bxng_goals', []);
+  const [coachConversations, setCoachConversations] = useIdbStorage('bxng_coach_conversations', []);
+  const [coachMemory, setCoachMemory] = useIdbStorage('bxng_coach_memory', {
     preferences: [], patterns: [], decisions: [], progress_notes: []
   });
-  const [coachSettings, setCoachSettings] = useLocalStorage('bxng_coach_settings', {
+  const [coachSettings, setCoachSettings] = useIdbStorage('bxng_coach_settings', {
     apiKey: '', model: 'claude-sonnet-4-20250514'
   });
 
-  // Pending coach context (set after logging a session, consumed by CoachView)
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
 
   useEffect(() => {
     const todayWeekId = getWeekId();
     
-    // Migration from old single schedule or first load
     if (!weeks) {
-       const oldScheduleRaw = window.localStorage.getItem('bxng_schedule');
-       let starterSchedule = initialSchedule;
-       if (oldScheduleRaw) {
-         try { starterSchedule = JSON.parse(oldScheduleRaw); } catch(e){}
-       }
-       setWeeks({ [todayWeekId]: starterSchedule });
+       setWeeks({ [todayWeekId]: initialSchedule });
        setCurrentWeekId(todayWeekId);
     } else if (!currentWeekId) {
        setCurrentWeekId(todayWeekId);
     }
 
     if (appVersion !== APP_VERSION) {
-      // Force rewrite only when the app version truly changes
       setWeeks({ [todayWeekId]: initialSchedule });
       setCurrentWeekId(todayWeekId);
       resetTimerPresets();
@@ -185,12 +252,11 @@ export function useAppState() {
     }
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, resetTimerPresets, setAppVersion]);
 
-  // Alias for backward compatibility with views
   const schedule = weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;
   
   const setSchedule = (newSchedule) => {
     if (!currentWeekId) return;
-    setWeeks(prev => ({ ...prev, [currentWeekId]: newSchedule }));
+    setWeeks(prev => ({ ...(prev || {}), [currentWeekId]: newSchedule }));
   };
 
   return {
@@ -207,46 +273,4 @@ export function useAppState() {
     coachSettings, setCoachSettings,
     pendingCoachContext, setPendingCoachContext
   };
-}
-
-// Same useLocalStorage functions below normally...
-export function useLocalStorage(key, initialValue) {
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch { return initialValue; }
-  });
-
-  const setValue = value => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch (error) { console.warn(error); }
-  };
-  return [storedValue, setValue];
-}
-
-function useLocalStorageWithReset(key, initialValue) {
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch { return initialValue; }
-  });
-
-  const setValue = value => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch (error) {}
-  };
-
-  const resetValue = () => {
-    setStoredValue(initialValue);
-    window.localStorage.setItem(key, JSON.stringify(initialValue));
-  };
-  return [storedValue, setValue, resetValue];
 }

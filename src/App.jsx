@@ -9,12 +9,12 @@ import { LoggerView } from './views/LoggerView';
 import { StatsView } from './views/StatsView';
 import { ProfileView } from './views/ProfileView';
 import { CoachView } from './views/CoachView';
-import { useAppState, useLocalStorage } from './hooks/useAppState';
+import { useAppState, AppStateProvider, useIdbStorage } from './hooks/useAppState';
 import { TimerProvider } from './components/TimerContext';
 import { GlobalTimerBar } from './components/GlobalTimerBar';
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useLocalStorage('bxng_active_tab', 'schedule');
+  const [activeTab, setActiveTab] = useIdbStorage('bxng_active_tab', 'schedule');
   const appState = useAppState();
 
   const renderView = () => {
@@ -45,7 +45,9 @@ function AppContent() {
 function App() {
   return (
     <DialogProvider>
-      <AppContent />
+      <AppStateProvider>
+        <AppContent />
+      </AppStateProvider>
     </DialogProvider>
   );
 }
