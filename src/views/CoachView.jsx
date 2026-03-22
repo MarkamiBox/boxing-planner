@@ -471,63 +471,63 @@ export function CoachView({
           )}
         </div>
         <div className="coach-header-actions">
-           <select 
-             className="coach-provider-select" 
-             value={coachSettings.activeProvider} 
-             style={{ fontSize: '0.75rem', padding: '2px 4px' }} 
-             onChange={e => {
-               const p = e.target.value;
-               const k = p === 'anthropic' ? (coachSettings.anthropicKey || '') : p === 'google' ? (coachSettings.googleKey || '') : (coachSettings.openrouterKey || '');
-               setCoachSettings({ 
-                 ...coachSettings, 
-                 activeProvider: p, 
-                 apiKey: k, 
-                 model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022' 
-               });
-             }}
-           >
-             <option value="anthropic">Anthropic</option>
-             <option value="google">Google</option>
-             <option value="openrouter">OpenRouter</option>
-           </select>
+           <div className="coach-model-group">
+              <select 
+                className="coach-provider-select" 
+                value={coachSettings.activeProvider} 
+                onChange={e => {
+                  const p = e.target.value;
+                  const k = p === 'anthropic' ? (coachSettings.anthropicKey || '') : p === 'google' ? (coachSettings.googleKey || '') : (coachSettings.openrouterKey || '');
+                  setCoachSettings({ 
+                    ...coachSettings, 
+                    activeProvider: p, 
+                    apiKey: k, 
+                    model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022' 
+                  });
+                }}
+              >
+                <option value="anthropic">Anthropic</option>
+                <option value="google">Google</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
 
-           <select 
-             className="coach-model-select" 
-             value={coachSettings.model} 
-             style={{ fontSize: '0.75rem', padding: '2px 4px', maxWidth: '140px' }} 
-             onChange={e => {
-               if (e.target.value === 'CUSTOM') {
-                 const custom = prompt('Inserisci ID Modello OpenRouter (es. openai/gpt-4o):');
-                 if (custom) setCoachSettings({ ...coachSettings, model: custom });
-               } else {
-                 setCoachSettings({ ...coachSettings, model: e.target.value });
-               }
-             }}
-           >
-             {coachSettings.activeProvider === 'google' ? (
-               <>
-                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-               </>
-             ) : coachSettings.activeProvider === 'openrouter' ? (
-               <>
-                 <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
-                 <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (OR)</option>
-                 <option value="google/gemini-flash-1.5">Gemini 1.5 Flash (OR)</option>
-                 <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B (OR)</option>
-                 <option value="openai/gpt-4o-mini">GPT-4o Mini (OR)</option>
-                 <option value="CUSTOM">Altro (Custom)...</option>
-               </>
-             ) : (
-               <>
-                 <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                 <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                 <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-               </>
-             )}
-           </select>
-           <button className="btn-icon" onClick={() => setShowMemory(true)}><Brain size={18} /></button>
-           <button className="btn-icon" onClick={createNewConversation}><Plus size={18} /></button>
-           <button className="btn-icon" onClick={() => setShowSettings(true)}><Settings size={16} /></button>
+              <select 
+                className="coach-model-select" 
+                value={coachSettings.model} 
+                onChange={e => {
+                  if (e.target.value === 'CUSTOM') {
+                    const custom = prompt('Inserisci ID Modello OpenRouter (es. openai/gpt-4o):');
+                    if (custom) setCoachSettings({ ...coachSettings, model: custom });
+                  } else {
+                    setCoachSettings({ ...coachSettings, model: e.target.value });
+                  }
+                }}
+              >
+                {coachSettings.activeProvider === 'google' ? (
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                ) : coachSettings.activeProvider === 'openrouter' ? (
+                  <>
+                    <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+                    <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (OR)</option>
+                    <option value="google/gemini-flash-1.5">Gemini 1.5 Flash (OR)</option>
+                    <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B (OR)</option>
+                    <option value="openai/gpt-4o-mini">GPT-4o Mini (OR)</option>
+                    <option value="CUSTOM">Altro (Custom)...</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                  </>
+                )}
+              </select>
+           </div>
+           <div className="coach-tool-group">
+              <button className="btn-icon" onClick={() => setShowMemory(true)}><Brain size={18} /></button>
+              <button className="btn-icon" onClick={createNewConversation}><Plus size={18} /></button>
+              <button className="btn-icon" onClick={() => setShowSettings(true)}><Settings size={16} /></button>
+           </div>
         </div>
       </div>
 
