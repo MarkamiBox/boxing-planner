@@ -188,7 +188,12 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     if (!currentStep) return;
 
     if (currentStep.type === 'timer' || currentStep.type === 'manual_timer') {
-      advanceGuidedStep();
+      if (phase === 'prep' && currentStep.type === 'timer') {
+        setPhase('work');
+        setTimeLeft(currentStep.duration);
+      } else {
+        advanceGuidedStep();
+      }
     } else if (currentStep.type === 'interval') {
       if (phase === 'prep') {
         setPhase('work');
@@ -468,7 +473,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       getPhaseColor, getPhaseLabel,
       
       // Actions
-      startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet,
+      startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet, advanceGuidedStep,
       
       // Global Settings
       globalPrepTime

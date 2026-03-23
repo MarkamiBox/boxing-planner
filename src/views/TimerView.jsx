@@ -11,7 +11,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
     isRunning, phase, timeLeft, currentRound, currentStepIdx,
     isGuided, currentStep,
     getPhaseColor, getPhaseLabel,
-    startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet
+    startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet, advanceGuidedStep
   } = useTimer();
 
   const getCurrentInstruction = () => {
@@ -66,7 +66,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
     return (
       <div className="text-step-container">
         <p className="text-instruction">{currentStep.instruction}</p>
-        <button className="btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={skipStep}>
+        <button className="btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={advanceGuidedStep}>
           <CheckCircle size={18} /> MARK DONE
         </button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, X, Save } from 'lucide-react';
+import { Trash2, X, Save, ArrowUp, ArrowDown } from 'lucide-react';
 import { TimeInput } from './TimeInput';
 
 export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
@@ -28,9 +28,25 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
     setForm({ ...form, steps: form.steps.filter((_, i) => i !== idx) });
   };
 
+  const moveStep = (idx, dir) => {
+    if (dir === 'up' && idx > 0) {
+      const newSteps = [...form.steps];
+      [newSteps[idx - 1], newSteps[idx]] = [newSteps[idx], newSteps[idx - 1]];
+      setForm({ ...form, steps: newSteps });
+    } else if (dir === 'down' && idx < form.steps.length - 1) {
+      const newSteps = [...form.steps];
+      [newSteps[idx + 1], newSteps[idx]] = [newSteps[idx], newSteps[idx + 1]];
+      setForm({ ...form, steps: newSteps });
+    }
+  };
+
   const renderStep = (step, idx) => (
     <div key={idx} className="step-edit-box" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '2px' }}>
+          <button onClick={() => moveStep(idx, 'up')} disabled={idx === 0} style={{ color: idx === 0 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowUp size={16}/></button>
+          <button onClick={() => moveStep(idx, 'down')} disabled={idx === form.steps.length - 1} style={{ color: idx === form.steps.length - 1 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === form.steps.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowDown size={16}/></button>
+        </div>
         <select value={step.type} onChange={e => updateStep(idx, 'type', e.target.value)} style={{ flex: 1, fontSize: '0.8rem', padding: '4px' }}>
           <option value="text">Testo</option>
           <option value="timer">Timer</option>

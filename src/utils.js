@@ -36,9 +36,6 @@ export function formatTime(seconds) {
  */
 export function calculateDuration(workout) {
   if (!workout) return 0;
-  if (workout.timerStats?.actualDuration) {
-    return Math.round(workout.timerStats.actualDuration / 60);
-  }
   
   let stepsDuration = 0;
   if (workout.steps && workout.steps.length > 0) {
