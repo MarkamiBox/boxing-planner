@@ -53,8 +53,8 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
 
   const handleAttachLocationSchedule = (idx) => {
     showChoice("Update Courses", "How would you like to provide the courses schedule for this location?", [
-      { 
-        label: "Upload JSON File", 
+      {
+        label: "Upload JSON File",
         onClick: () => {
           const input = document.createElement('input');
           input.type = 'file';
@@ -156,11 +156,11 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           input.type = 'file';
           input.accept = '.json';
           input.onchange = (e) => {
-             const file = e.target.files[0];
-             if (!file) return;
-             const reader = new FileReader();
-             reader.onload = (event) => onFile(event.target.result);
-             reader.readAsText(file);
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => onFile(event.target.result);
+            reader.readAsText(file);
           };
           input.click();
         }
@@ -195,7 +195,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     try {
       const importedSchedule = JSON.parse(text);
       if (importedSchedule.monday && importedSchedule.sunday) {
-        setSchedule(importedSchedule); 
+        setSchedule(importedSchedule);
         showAlert("Success", "Schedule imported into the current week successfully!");
       } else {
         showAlert("Error", "Invalid JSON structure for schedule.");
@@ -209,11 +209,11 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     const data = {};
     const allKeys = await idbKeys();
     for (const key of allKeys) {
-       if (key && key.startsWith('bxng_')) {
-          try {
-            data[key] = await get(key);
-          } catch(e) {}
-       }
+      if (key && key.startsWith('bxng_')) {
+        try {
+          data[key] = await get(key);
+        } catch (e) { }
+      }
     }
     handleExportWithChoice("Full Account", data, "boxing_planner_backup");
   };
@@ -223,16 +223,16 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       const data = JSON.parse(text);
       if (!data.bxng_profile) throw new Error("Invalid format");
       showConfirm("Restore Account", "This will overwrite your ENTIRE account data (logs, schedule, profile). Are you sure?", async () => {
-         const promises = [];
-         Object.keys(data).forEach(key => {
-            if (key.startsWith('bxng_')) {
-               promises.push(set(key, data[key]));
-            }
-         });
-         await Promise.all(promises);
-         window.location.reload(); 
+        const promises = [];
+        Object.keys(data).forEach(key => {
+          if (key.startsWith('bxng_')) {
+            promises.push(set(key, data[key]));
+          }
+        });
+        await Promise.all(promises);
+        window.location.reload();
       });
-    } catch(e) {
+    } catch (e) {
       showAlert("Error", "Invalid account backup JSON.");
     }
   };
@@ -450,27 +450,6 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           <input type="number" value={localProfile.prepTime !== undefined ? localProfile.prepTime : 10} onChange={e => handleChange('prepTime', Number(e.target.value))} />
         </div>
 
-        <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Timer & Notes</h3>
-
-        <div className="form-group">
-          <label>Voice Trigger Word</label>
-          <input type="text" value={localProfile.voiceTriggerWord || 'nota'} onChange={e => handleChange('voiceTriggerWord', e.target.value)} placeholder="e.g. nota" />
-        </div>
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem', height: '100%', paddingTop: '1.5rem' }}>
-          <label style={{ margin: 0 }}>Voice Notes</label>
-          <label className="switch">
-            <input 
-              type="checkbox" 
-              checked={localProfile.voiceNotesEnabled !== false} 
-              onChange={e => handleChange('voiceNotesEnabled', e.target.checked)}
-            />
-            <span className="slider-toggle"></span>
-          </label>
-          <span style={{ fontSize: '0.85rem', color: localProfile.voiceNotesEnabled !== false ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>
-            {localProfile.voiceNotesEnabled !== false ? 'ON' : 'OFF'}
-          </span>
-        </div>
-
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Technical Levels (1-5)</h3>
 
         <div className="levels-grid" style={{ gridColumn: '1 / -1' }}>
@@ -485,42 +464,42 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Locations & Equipment</h3>
         <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {(localProfile.locations || []).map((loc, idx) => (
-             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                 <input type="text" value={loc.name} onChange={e => handleLocationChange(idx, 'name', e.target.value)} placeholder="Location (e.g. Home)" style={{ flex: 1 }} />
-                 <input type="text" value={loc.equipment} onChange={e => handleLocationChange(idx, 'equipment', e.target.value)} placeholder="Equipment (e.g. Heavy Bag, Dumbbells)" style={{ flex: 2 }} />
-                 <button className="btn-icon danger" onClick={() => removeLocation(idx)} style={{ padding: '6px' }}><Trash2 size={16}/></button>
-               </div>
-               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                   {loc.schedule ? `✅ ${Array.isArray(loc.schedule) ? loc.schedule.length : Object.keys(loc.schedule).length} courses loaded` : `No courses schedule loaded`}
-                 </span>
-                 <button className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleAttachLocationSchedule(idx)}>
-                   <Upload size={14} style={{ marginRight: '4px' }}/> {loc.schedule ? 'Manage Courses' : 'Set Courses'}
-                 </button>
-               </div>
-               {loc.schedule && (
-                 <div style={{ marginTop: '0.5rem', background: 'var(--bg-color)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8rem' }}>
-                   <button onClick={() => toggleLoc(idx)} style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 600 }}>Review Courses List</span>
-                      {expandedLocs[idx] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                   </button>
-                   {expandedLocs[idx] && (
-                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                         {Array.isArray(loc.schedule) ? loc.schedule.map((c, i) => (
-                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', marginTop: '4px' }}>
-                              <span>{c.day} @ {c.time}</span>
-                              <strong style={{ textAlign: 'right' }}>{c.course}</strong>
-                           </div>
-                         )) : <pre style={{maxHeight:'100px', overflow:'auto'}}>{JSON.stringify(loc.schedule, null, 2)}</pre>}
-                      </div>
-                   )}
-                 </div>
-               )}
-             </div>
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input type="text" value={loc.name} onChange={e => handleLocationChange(idx, 'name', e.target.value)} placeholder="Location (e.g. Home)" style={{ flex: 1 }} />
+                <input type="text" value={loc.equipment} onChange={e => handleLocationChange(idx, 'equipment', e.target.value)} placeholder="Equipment (e.g. Heavy Bag, Dumbbells)" style={{ flex: 2 }} />
+                <button className="btn-icon danger" onClick={() => removeLocation(idx)} style={{ padding: '6px' }}><Trash2 size={16} /></button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  {loc.schedule ? `✅ ${Array.isArray(loc.schedule) ? loc.schedule.length : Object.keys(loc.schedule).length} courses loaded` : `No courses schedule loaded`}
+                </span>
+                <button className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleAttachLocationSchedule(idx)}>
+                  <Upload size={14} style={{ marginRight: '4px' }} /> {loc.schedule ? 'Manage Courses' : 'Set Courses'}
+                </button>
+              </div>
+              {loc.schedule && (
+                <div style={{ marginTop: '0.5rem', background: 'var(--bg-color)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8rem' }}>
+                  <button onClick={() => toggleLoc(idx)} style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>Review Courses List</span>
+                    {expandedLocs[idx] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                  {expandedLocs[idx] && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {Array.isArray(loc.schedule) ? loc.schedule.map((c, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', marginTop: '4px' }}>
+                          <span>{c.day} @ {c.time}</span>
+                          <strong style={{ textAlign: 'right' }}>{c.course}</strong>
+                        </div>
+                      )) : <pre style={{ maxHeight: '100px', overflow: 'auto' }}>{JSON.stringify(loc.schedule, null, 2)}</pre>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
           <button className="btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }} onClick={addLocation}>
-            <Plus size={14}/> Add Location
+            <Plus size={14} /> Add Location
           </button>
         </div>
 
@@ -651,7 +630,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
 
         <div style={{ display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '0.5rem' }}>
           <button className="btn-secondary" style={{ flex: 1 }} onClick={handleExportLogs}>
-            <Download size={18} /> Export Logs  
+            <Download size={18} /> Export Logs
           </button>
           <button className="btn-secondary" style={{ flex: 1 }} onClick={() => handleImportWithChoice("Import Logs", handleImportLogs, handleImportLogs)}>
             <Upload size={18} /> Import Logs

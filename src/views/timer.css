@@ -194,8 +194,8 @@
 /* Floating Note Bubble */
 .note-bubble-container {
   position: fixed;
-  bottom: 120px; /* Above the global timer bar which is at bottom: 0 */
-  left: 20px;
+  bottom: 85px; /* Above the global timer bar which is at bottom: 0 */
+  right: 20px;
   z-index: 95;
 }
 
@@ -233,6 +233,7 @@
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
   z-index: 1;
+  transform-origin: bottom right;
 }
 
 @keyframes slideUp {

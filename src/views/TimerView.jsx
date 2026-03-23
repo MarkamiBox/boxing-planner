@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Square, Volume2, VolumeX, CheckCircle, SkipForward, SkipBack, X, Mic, StickyNote } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Pause, Square, Volume2, VolumeX, CheckCircle, SkipForward, SkipBack, X, StickyNote } from 'lucide-react';
 import { useTimer } from '../components/TimerContext';
 import { formatTime } from '../utils';
 import './timer.css';
@@ -8,15 +8,7 @@ function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
   const { phase, getNoteTag, isRunning } = useTimer();
   const [isOpen, setIsOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
   
-  useEffect(() => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      setSpeechSupported(false);
-    }
-  }, []);
-
   const handleSave = () => {
     if (!noteText.trim()) return;
     const tag = getNoteTag();
@@ -31,24 +23,6 @@ function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
     setIsOpen(false);
   };
 
-  const startVoiceNote = () => {
-    if (!speechSupported) return;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = navigator.language || 'it-IT';
-    recognition.interimResults = false;
-
-    recognition.onstart = () => setIsRecording(true);
-    recognition.onend = () => setIsRecording(false);
-    recognition.onerror = () => setIsRecording(false);
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setNoteText(prev => prev ? prev + ' ' + transcript : transcript);
-    };
-
-    recognition.start();
-  };
-
   if (phase === 'stopped') return null;
 
   return (
@@ -60,31 +34,18 @@ function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
             <button className="btn-icon" onClick={() => setIsOpen(false)}><X size={18}/></button>
           </div>
           <div className="note-panel-body">
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
             <textarea 
-              className="note-textarea"
-              placeholder="Type your note..."
+              autoFocus
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              autoFocus
+              placeholder="Scrivi una nota..."
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.9rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', minHeight: '80px', resize: 'none' }}
             />
-            <div className="note-input-actions">
-              <button 
-                className={`mic-btn ${isRecording ? 'recording' : ''}`}
-                onClick={startVoiceNote}
-                title={speechSupported ? "Record voice note" : "Voice not supported"}
-                disabled={!speechSupported || isRecording}
-              >
-                <Mic size={20} />
-              </button>
-              <button 
-                className="btn-primary" 
-                style={{ flex: 1 }} 
-                onClick={handleSave}
-                disabled={!noteText.trim()}
-              >
-                Save Note
-              </button>
-            </div>
+          </div>
+          <button className="btn-primary w-full" onClick={handleSave} disabled={!noteText.trim()}>
+            Salva Nota
+          </button>
             
             {sessionNotes.length > 0 && (
               <div className="note-history">
