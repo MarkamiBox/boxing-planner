@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(dir:*)",
-      "Bash(del \"C:\\\\Users\\\\Salvatore\\\\Desktop\\\\boxing-planner\\\\.claude\\\\worktrees\\\\elegant-poitras\\\\src\\\\utils\\\\pipTimer.js\")",
-      "Bash(npm run build:*)"
-    ]
-  }
-}
