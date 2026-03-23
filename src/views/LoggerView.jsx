@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain, StickyNote } from 'lucide-react';
 import { calculateDuration } from '../utils';
+import { BodyDummy } from '../components/BodyDummy';
 import './logger.css';
 
 export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext, sessionNotes, clearSessionNotes }) {
@@ -47,7 +48,8 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   const [bodyWeight, setBodyWeight] = useState(recentLogWithWeight?.bodyWeight || '');
   const [sleepHours, setSleepHours] = useState(recentLogWithSleep?.sleepHours || '');
   const [sleepQuality, setSleepQuality] = useState(recentLogWithSleep?.sleepQuality || 7);
-  const [musclesSoreness, setMusclesSoreness] = useState(3);
+  const [bodyMap, setBodyMap] = useState({});
+  const [expandedBodyMapLogId, setExpandedBodyMapLogId] = useState(null);
 
   const [savedMessage, setSavedMessage] = useState(false);
 
@@ -100,7 +102,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
       bodyWeight: bodyWeight ? Number(bodyWeight) : null,
       sleepHours: sleepHours ? Number(sleepHours) : null,
       sleepQuality,
-      musclesSoreness,
+      bodyMap: Object.keys(bodyMap).length > 0 ? bodyMap : undefined,
       skippedSteps: activeWorkout?.timerStats?.skippedSteps || 0,
       plannedDuration: activeWorkout?.timerStats?.plannedDuration || 0,
       ...specificData
@@ -137,6 +139,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     }, 1500);
     setNotes('');
     setDurationStr('');
+    setBodyMap({});
   };
 
   const handleDeleteLog = (id) => {
@@ -149,7 +152,11 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   };
 
   const saveEdit = () => {
-    setLogs(logs.map(l => l.id === editingLogId ? { ...l, ...editDraft } : l));
+    const finalized = { ...editDraft };
+    if (finalized.bodyMap && Object.keys(finalized.bodyMap).length === 0) {
+      delete finalized.bodyMap;
+    }
+    setLogs(logs.map(l => l.id === editingLogId ? finalized : l));
     setEditingLogId(null);
     setEditDraft(null);
   };
@@ -278,10 +285,6 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
            </div>
         )}
 
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Dolori muscolari</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{musclesSoreness}/10</span></div>
-          <input type="range" min="1" max="10" value={musclesSoreness} onChange={e => setMusclesSoreness(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '0.25rem' }} />
-        </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <div style={{ flex: 1 }}>
@@ -326,6 +329,22 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
             </button>
           </div>
         )}
+
+        {/* Body Soreness Card */}
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '0.75rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+            Indolenzimento Muscolare
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Tocca le zone dove senti dolore o affaticamento.
+          </div>
+          <BodyDummy
+            bodyMap={bodyMap}
+            onChange={setBodyMap}
+            currentRound={activeWorkout?.timerStats?.completedRounds || 0}
+            maxRounds={activeWorkout?.steps?.length || activeWorkout?.rounds || 12}
+          />
+        </div>
 
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}><span>Note (opzionale)</span></div>
@@ -432,7 +451,18 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
                   </div>
 
                   {renderEditSlider('Qualità Sonno', 'sleepQuality')}
-                  {renderEditSlider('Dolori Musc.', 'musclesSoreness')}
+
+                  {/* Soreness Map Editing */}
+                  <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '0.75rem' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+                      Indolenzimento Muscolare
+                    </div>
+                    <BodyDummy
+                      bodyMap={editDraft.bodyMap || {}}
+                      onChange={m => setEditDraft(d => ({ ...d, bodyMap: m }))}
+                      maxRounds={editDraft.plannedDuration || 12}
+                    />
+                  </div>
 
                   {renderEditSlider('Energy', 'energy')}
                   {renderEditSlider('Cardio', 'cardio')}
@@ -484,6 +514,27 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
                   {log.skippedSteps > 0 && (
                     <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '4px' }}>
                       ⏭ Skipped {log.skippedSteps} guided steps
+                    </div>
+                  )}
+                  {log.bodyMap && Object.keys(log.bodyMap).length > 0 && (
+                    <div style={{ marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedBodyMapLogId(expandedBodyMapLogId === log.id ? null : log.id)}
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                      >
+                        🗺 Body map ({Object.keys(log.bodyMap).length} zone{Object.keys(log.bodyMap).length !== 1 ? 's' : ''}) {expandedBodyMapLogId === log.id ? '▲' : '▼'}
+                      </button>
+                      {expandedBodyMapLogId === log.id && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <BodyDummy bodyMap={log.bodyMap} maxRounds={log.plannedDuration || 0} readonly showLegend />
+                        </div>
+                      )}
+                      {expandedBodyMapLogId !== log.id && (
+                        <div style={{ marginTop: '4px', pointerEvents: 'none' }}>
+                          <BodyDummy bodyMap={log.bodyMap} maxRounds={log.plannedDuration || 0} readonly compact />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

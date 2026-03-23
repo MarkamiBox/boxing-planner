@@ -3,6 +3,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { Trash2, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { getWeekId } from '../utils';
 import { useDialog } from '../components/DialogContext';
+import { BodyDummy, getWeightedIntensity, getSorenessColor } from '../components/BodyDummy';
 import './stats.css';
 
 function parseMins(log) {
@@ -38,6 +39,7 @@ export function StatsView({ logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [bodyMapRange, setBodyMapRange] = useState(30);
 
   // ─── KPI Computations ────────────────────────────────────────────────────────
   const typeCounts = logs.reduce((acc, log) => {
@@ -212,6 +214,7 @@ export function StatsView({ logs, setLogs }) {
         <TabBtn id="boxscore" label="By Type" />
         <TabBtn id="records" label="Records 🏆" />
         <TabBtn id="heatmap" label="Heatmap" />
+        <TabBtn id="bodymap" label="Body Map 🗺" />
         <TabBtn id="history" label="History" />
       </div>
 
@@ -476,6 +479,135 @@ export function StatsView({ logs, setLogs }) {
           </div>
         </div>
       )}
+
+      {/* ── Body Map ── */}
+      {activeTab === 'bodymap' && (() => {
+        // Filter logs by selected range
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - (bodyMapRange === 0 ? 99999 : bodyMapRange));
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+        const rangeLogs = logs.filter(l => l.bodyMap && (bodyMapRange === 0 || l.date >= cutoffStr));
+        const totalSess = rangeLogs.length;
+
+        // Aggregate per zone
+        const zoneAgg = {}; // zoneId -> { sum, count, sessions (Set of log ids) }
+        rangeLogs.forEach(log => {
+          const maxR = log.plannedDuration || 0;
+          Object.entries(log.bodyMap).forEach(([zoneId, entry]) => {
+            if (zoneId.startsWith('custom_')) return;
+            const wi = getWeightedIntensity(entry.intensity, entry.roundLogged, maxR);
+            if (!zoneAgg[zoneId]) zoneAgg[zoneId] = { sum: 0, count: 0, sessions: new Set() };
+            zoneAgg[zoneId].sum += wi;
+            zoneAgg[zoneId].count += 1;
+            zoneAgg[zoneId].sessions.add(log.id);
+          });
+        });
+
+        // Build cumulative bodyMap for display (average weighted intensity)
+        const cumulativeBodyMap = {};
+        Object.entries(zoneAgg).forEach(([zoneId, agg]) => {
+          const avgWI = agg.sum / agg.count;
+          const freqMult = agg.sessions.size / (totalSess || 1);
+          const display = Math.min(5, avgWI * freqMult * 2); // scale so freq affects color
+          cumulativeBodyMap[zoneId] = { intensity: display, roundLogged: 0 };
+        });
+
+        // Ranked zones top 5
+        const ranked = Object.entries(zoneAgg)
+          .map(([zoneId, agg]) => ({
+            zoneId,
+            avgWI: agg.sum / agg.count,
+            sessions: agg.sessions.size,
+            freqMult: agg.sessions.size / (totalSess || 1),
+          }))
+          .sort((a, b) => (b.avgWI * b.freqMult) - (a.avgWI * a.freqMult))
+          .slice(0, 5);
+
+        // Streak warnings: find zones sore in 3+ consecutive sessions
+        const sortedLogs = [...logs].filter(l => l.bodyMap).sort((a, b) => a.date.localeCompare(b.date));
+        const streakWarnings = [];
+        const allZoneIds = [...new Set(sortedLogs.flatMap(l => Object.keys(l.bodyMap).filter(k => !k.startsWith('custom_'))))];
+        allZoneIds.forEach(zoneId => {
+          let streak = 0;
+          let maxStreak = 0;
+          sortedLogs.forEach(log => {
+            if (log.bodyMap[zoneId]) { streak++; maxStreak = Math.max(maxStreak, streak); }
+            else streak = 0;
+          });
+          if (maxStreak >= 3) streakWarnings.push({ zoneId, streak: maxStreak });
+        });
+
+        // Zone label helper
+        const ZONE_LABELS = {
+          head: 'Head', shoulders: 'Shoulders', chest: 'Chest', arms: 'Arms',
+          hands: 'Hands', core: 'Core', hips: 'Hips', quads: 'Quads',
+          neck_back: 'Neck/Trap', lower_back: 'Lower Back', glutes: 'Glutes', calves: 'Calves',
+        };
+
+        const intensityEmoji = (wi) => {
+          if (wi >= 4) return '🔴';
+          if (wi >= 3) return '🟠';
+          if (wi >= 2) return '🟡';
+          return '🟢';
+        };
+
+        return (
+          <>
+            {/* Range selector */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              {[{ label: 'Last 7 days', val: 7 }, { label: 'Last 30 days', val: 30 }, { label: 'All time', val: 0 }].map(opt => (
+                <button
+                  key={opt.val}
+                  onClick={() => setBodyMapRange(opt.val)}
+                  style={{
+                    padding: '0.4rem 0.9rem', fontSize: '0.8rem', fontWeight: 600, borderRadius: '6px',
+                    background: bodyMapRange === opt.val ? 'var(--primary)' : 'var(--surface-hover)',
+                    color: bodyMapRange === opt.val ? '#fff' : 'var(--text-muted)',
+                    border: bodyMapRange === opt.val ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                    cursor: 'pointer',
+                  }}
+                >{opt.label}</button>
+              ))}
+            </div>
+
+            {/* Streak warnings */}
+            {streakWarnings.map(({ zoneId, streak }) => (
+              <div key={zoneId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 0.9rem', background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '8px', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+                ⚠️ <strong>{ZONE_LABELS[zoneId] || zoneId}</strong> has been sore for {streak} sessions in a row — consider a recovery day.
+              </div>
+            ))}
+
+            {totalSess === 0 ? (
+              <div className="card"><div className="empty-state">No body map data in this range. Start logging soreness zones!</div></div>
+            ) : (
+              <>
+                <div className="card" style={{ marginBottom: '1rem' }}>
+                  <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Cumulative Soreness ({totalSess} sessions)</h3>
+                  <BodyDummy bodyMap={cumulativeBodyMap} maxRounds={0} readonly showLegend />
+                </div>
+
+                {ranked.length > 0 && (
+                  <div className="card">
+                    <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Most Stressed Zones</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {ranked.map(({ zoneId, avgWI, sessions: sess }) => (
+                        <div key={zoneId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span style={{ width: '1.2rem', textAlign: 'center' }}>{intensityEmoji(avgWI)}</span>
+                          <span style={{ width: '7rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>{ZONE_LABELS[zoneId] || zoneId}</span>
+                          <div style={{ flex: 1, height: '8px', background: 'var(--surface-hover)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(100, (avgWI / 5) * 100)}%`, height: '100%', background: getSorenessColor(avgWI), borderRadius: '4px', transition: 'width 0.3s' }} />
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', minWidth: '6rem', textAlign: 'right' }}>{avgWI.toFixed(1)} avg · {sess} session{sess !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── History ── */}
       {activeTab === 'history' && (

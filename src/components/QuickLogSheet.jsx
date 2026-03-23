@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, StickyNote } from 'lucide-react';
+import { BodyDummy } from './BodyDummy';
 
 export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
   const recentLogWithWeight = logs?.find(l => l.bodyWeight);
@@ -33,7 +34,7 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
   const [sparringRounds, setSparringRounds] = useState(0);
   const [lastRoundDrop, setLastRoundDrop] = useState(5);
 
-  const [musclesSoreness, setSoreness] = useState(3);
+  const [bodyMap, setBodyMap] = useState({});
   const [sleepHours, setSleepHours] = useState(recentLogWithSleep?.sleepHours || '');
   const [sleepQuality, setSleepQuality] = useState(recentLogWithSleep?.sleepQuality || 7);
   const [bodyWeight, setBodyWeight] = useState(recentLogWithWeight?.bodyWeight || '');
@@ -55,7 +56,7 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
       legs,
       intensity,
       focus,
-      musclesSoreness,
+      bodyMap: Object.keys(bodyMap).length > 0 ? bodyMap : undefined,
       sleepHours: sleepHours ? Number(sleepHours) : null,
       sleepQuality,
       bodyWeight: bodyWeight ? Number(bodyWeight) : null,
@@ -147,7 +148,21 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
            </div>
         )}
 
-        {renderSlider('Dolori muscolari', musclesSoreness, setSoreness)}
+        {/* Body Soreness */}
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '0.75rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+            Indolenzimento Muscolare
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Tocca le zone dove senti dolore o affaticamento.
+          </div>
+          <BodyDummy
+            bodyMap={bodyMap}
+            onChange={setBodyMap}
+            currentRound={exercise?.timerStats?.completedRounds || 0}
+            maxRounds={exercise?.steps?.length || exercise?.rounds || 12}
+          />
+        </div>
 
         {/* Body & Sleep */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
