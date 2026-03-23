@@ -423,9 +423,10 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
 8. STRETCHING: Always include a 'Recovery' exercise or 'text' steps at the end of workouts with contextual stretching targeting the specific muscles used that day.
 9. LOCATIONS: If the user has defined training locations/equipment, plan workouts strictly based on the equipment available at their chosen location.
 11. TIMING: Always set the 'plannedTime' field in HH:mm format (e.g. "17:30"). Never omit it if a specific time is mentioned. If no exact time is given, use a reasonable default based on context (morning session → "09:00", afternoon → "16:00", evening → "19:00").
-12. GYM vs HOME:
-    - iGym / Orbean: These locations have FIXED course schedules. If the athlete mentions a course at these locations, DO NOT attempt to "structure" or "add steps" to it beyond simple placeholders. It is a fixed group class.
-    - Home / Parco: No scheduled courses here. You ARE responsible for providing a detailed, structured workout with steps.
+12. GYM vs LOCATION (Fixed Courses):
+    - If a location has a schedule loaded in the profile, it's a Gym providing FIXED courses. If you plan a course from that schedule, DO NOT attempt to "structure" or "add steps" to it.
+    - You MUST include the course's duration in the 'notes' field (e.g., "60 min"). If their schedule JSON has a duration, use it. The app expects this text to calculate the Average Time dynamically.
+    - If a location has NO schedule, it's just a place. You ARE responsible for providing a full, structured workout with steps.
 13. MEMORY: Be highly selective. Only store meaningful insights, enduring preferences, or significant milestones. Do not log raw session summaries.
 14. MULTIPLE TOOLS: If a user request requires multiple changes (e.g. remove X, add Y, and modify Z), you MUST call all appropriate tools in the SAME response. Do not perform changes one by one.
 

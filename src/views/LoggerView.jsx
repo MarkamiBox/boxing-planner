@@ -325,28 +325,87 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
               {editingLogId === log.id ? (
                 /* ---- EDIT MODE ---- */
                 <div>
-                  <div className="form-row" style={{ marginBottom: '0.5rem' }}>
-                    <div className="form-group">
-                      <label>Date</label>
-                      <input type="date" value={editDraft.date} onChange={e => setEditDraft(d => ({ ...d, date: e.target.value }))} />
+                  <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date</label>
+                      <input type="date" value={editDraft.date || ''} onChange={e => setEditDraft(d => ({ ...d, date: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
                     </div>
-                    <div className="form-group">
-                      <label>Time</label>
-                      <input type="time" value={editDraft.timeOfDay || ''} onChange={e => setEditDraft(d => ({ ...d, timeOfDay: e.target.value }))} />
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Time</label>
+                      <input type="time" value={editDraft.timeOfDay || ''} onChange={e => setEditDraft(d => ({ ...d, timeOfDay: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
                     </div>
-                    <div className="form-group">
-                      <label>Duration</label>
-                      <input type="text" value={editDraft.duration || ''} onChange={e => setEditDraft(d => ({ ...d, duration: e.target.value }))} />
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Duration</label>
+                      <input type="text" value={editDraft.duration || ''} onChange={e => setEditDraft(d => ({ ...d, duration: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
                     </div>
                   </div>
+                  <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ flex: 2 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Name</label>
+                      <input type="text" value={editDraft.name || ''} onChange={e => setEditDraft(d => ({ ...d, name: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Type</label>
+                      <select value={editDraft.type || 'Boxing'} onChange={e => setEditDraft(d => ({ ...d, type: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                        <option value="Boxing">Boxing</option>
+                        <option value="Running">Running</option>
+                        <option value="Strength">Strength</option>
+                        <option value="Recovery">Recovery</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {editDraft.type === 'Running' && (
+                    <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      <div className="form-group" style={{ flex: 1 }}><label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Dst (km)</label><input type="text" value={editDraft.distance || ''} onChange={e => setEditDraft(d => ({ ...d, distance: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} /></div>
+                      <div className="form-group" style={{ flex: 1 }}><label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pace</label><input type="text" value={editDraft.pace || ''} onChange={e => setEditDraft(d => ({ ...d, pace: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} /></div>
+                      <div className="form-group" style={{ flex: 1 }}><label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Time</label><input type="text" value={editDraft.time || ''} onChange={e => setEditDraft(d => ({ ...d, time: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} /></div>
+                    </div>
+                  )}
+
+                  {editDraft.type === 'Boxing' && (
+                    <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sparring Rnd</label>
+                        <input type="number" min="0" value={editDraft.sparringRounds || 0} onChange={e => setEditDraft(d => ({ ...d, sparringRounds: Number(e.target.value) }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                      </div>
+                      {editDraft.sparringRounds > 0 && <div className="form-group" style={{ flex: 2, marginTop: '-0.5rem' }}>{renderEditSlider('Last Rnd Drop', 'lastRoundDrop')}</div>}
+                    </div>
+                  )}
+
+                  <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Peso (kg)</label>
+                      <input type="number" step="0.1" value={editDraft.bodyWeight || ''} onChange={e => setEditDraft(d => ({ ...d, bodyWeight: e.target.value ? Number(e.target.value) : null }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ore Sonno</label>
+                      <input type="number" step="0.5" value={editDraft.sleepHours || ''} onChange={e => setEditDraft(d => ({ ...d, sleepHours: e.target.value ? Number(e.target.value) : null }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                    </div>
+                  </div>
+
+                  <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Skipped Steps</label>
+                      <input type="number" min="0" value={editDraft.skippedSteps || 0} onChange={e => setEditDraft(d => ({ ...d, skippedSteps: Number(e.target.value) }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Planned Dur.</label>
+                      <input type="number" min="0" value={editDraft.plannedDuration || 0} onChange={e => setEditDraft(d => ({ ...d, plannedDuration: Number(e.target.value) }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
+                    </div>
+                  </div>
+
+                  {renderEditSlider('Qualità Sonno', 'sleepQuality')}
+                  {renderEditSlider('Dolori Musc.', 'musclesSoreness')}
+
                   {renderEditSlider('Energy', 'energy')}
                   {renderEditSlider('Cardio', 'cardio')}
                   {renderEditSlider('Legs', 'legs')}
                   {renderEditSlider('Intensity', 'intensity')}
                   {renderEditSlider('Focus', 'focus')}
                   <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                    <label>Notes</label>
-                    <textarea rows="2" value={editDraft.notes || ''} onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))} />
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Notes</label>
+                    <textarea rows="2" value={editDraft.notes || ''} onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem', resize: 'vertical' }} />
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                     <button className="btn-primary" style={{ flex: 1 }} onClick={saveEdit}><Save size={16} /> Save</button>

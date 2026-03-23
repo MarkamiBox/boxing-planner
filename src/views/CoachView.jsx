@@ -78,7 +78,7 @@ export function CoachView({
   const [error, setError] = useState('');
   const [activeConvId, setActiveConvId] = useState(null);
   const [showMemory, setShowMemory] = useState(false);
-  const [showSchedulePreview, setShowSchedulePreview] = useState(true);
+  const [showSchedulePreview, setShowSchedulePreview] = useState(false);
   const [highlightedExercises, setHighlightedExercises] = useState(new Set());
   const [expandedTools, setExpandedTools] = useState(new Set());
   const [disabledToolIndices, setDisabledToolIndices] = useState(new Set());
@@ -581,11 +581,6 @@ export function CoachView({
         <div ref={messagesEndRef} style={{ height: '1px' }} />
       </div>
 
-      <div className="coach-input-area">
-        <textarea ref={textareaRef} value={inputText} onChange={e => setInputText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} placeholder="Scrivi al coach..." rows={1} disabled={isLoading} />
-        <button className="coach-send-btn" onClick={handleSend} disabled={isLoading || !inputText.trim()}><Send size={18} /></button>
-      </div>
-
       <div className="coach-schedule-preview">
         <h4>Weekly Preview <button onClick={() => setShowSchedulePreview(!showSchedulePreview)}>{showSchedulePreview ? <EyeOff size={14}/> : <Eye size={14}/>}</button></h4>
         {showSchedulePreview && daysOfWeek.map(day => (
@@ -596,6 +591,11 @@ export function CoachView({
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="coach-input-area">
+        <textarea ref={textareaRef} value={inputText} onChange={e => setInputText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} placeholder="Scrivi al coach..." rows={1} disabled={isLoading} />
+        <button className="coach-send-btn" onClick={handleSend} disabled={isLoading || !inputText.trim()}><Send size={18} /></button>
       </div>
       {showMemory && <><div className="modal-overlay" onClick={() => setShowMemory(false)} /><CoachMemoryPanel coachMemory={coachMemory} setCoachMemory={setCoachMemory} onClose={() => setShowMemory(false)} /></>}
     </div>
