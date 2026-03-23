@@ -5,13 +5,112 @@ import { formatTime } from '../utils';
 import './timer.css';
 
 function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
-  const { phase, getNoteTag, isRunning } = useTimer();
+  const { phase, isRunning, currentRound, currentStepIdx, activeWorkout, totalRounds } = useTimer();
   const [isOpen, setIsOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
   
+  // Override state
+  const [ovRound, setOvRound] = useState(currentRound);
+  const [ovStepIdx, setOvStepIdx] = useState(currentStepIdx);
+  const [ovPhase, setOvPhase] = useState(phase);
+  const [isAutoSync, setIsAutoSync] = useState(true);
+
+  const isGuided = !!(activeWorkout && activeWorkout.steps && activeWorkout.steps.length > 0);
+
+  // Reset auto-sync when opened
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsAutoSync(true);
+    }
+  }, [isOpen]);
+
+  // Keep in sync with live timer UNLESS user manually navigates
+  React.useEffect(() => {
+    if (isAutoSync) {
+      setOvRound(currentRound);
+      setOvStepIdx(currentStepIdx);
+      setOvPhase(phase === 'stopped' ? 'WORK' : phase);
+    }
+  }, [currentRound, currentStepIdx, phase, isAutoSync, activeWorkout, totalRounds]);
+
+  // AUTO-CATCHUP: If user manually navigates back to 'Present', re-enable auto-sync
+  React.useEffect(() => {
+    const livePhase = phase === 'stopped' ? 'WORK' : phase;
+    if (!isAutoSync && ovStepIdx === currentStepIdx && ovRound === currentRound && ovPhase === livePhase) {
+      setIsAutoSync(true);
+    }
+  }, [ovStepIdx, ovRound, ovPhase, currentStepIdx, currentRound, phase, isAutoSync]);
+
+  const phases = ['prep', 'work', 'rest'];
+
+  const noteSkipBack = () => {
+    setIsAutoSync(false);
+    // 1. Traverse phases within same round
+    const phaseIdx = phases.indexOf(ovPhase);
+    if (phaseIdx > 0) {
+      setOvPhase(phases[phaseIdx - 1]);
+      return;
+    }
+
+    // 2. Traverse to previous round
+    if (ovRound > 1) {
+      setOvRound(ovRound - 1);
+      const stepForRnd = isGuided ? activeWorkout.steps[ovStepIdx] : null;
+      setOvPhase(stepForRnd?.type === 'sets' ? 'work' : 'rest');
+      return;
+    }
+
+    // 3. Traverse to previous step
+    if (isGuided && ovStepIdx > 0) {
+      const prevIdx = ovStepIdx - 1;
+      const prevStep = activeWorkout.steps[prevIdx];
+      setOvStepIdx(prevIdx);
+      setOvRound(prevStep.rounds || prevStep.sets || 1);
+      setOvPhase('rest'); // End of previous step is usually rest
+    }
+  };
+
+  const noteSkipForward = () => {
+    setIsAutoSync(false);
+    const phaseIdx = phases.indexOf(ovPhase);
+    const stepObj = isGuided ? activeWorkout.steps[ovStepIdx] : null;
+    const maxRnds = stepObj?.rounds || stepObj?.sets || totalRounds;
+
+    // 1. Traverse phases within same round
+    if (phaseIdx < 2) {
+      setOvPhase(phases[phaseIdx + 1]);
+      return;
+    }
+
+    // 2. Traverse to next round
+    if (ovRound < maxRnds) {
+      setOvRound(ovRound + 1);
+      setOvPhase('prep');
+      return;
+    }
+
+    // 3. Traverse to next step
+    if (isGuided && ovStepIdx + 1 < activeWorkout.steps.length) {
+      const nextIdx = ovStepIdx + 1;
+      setOvStepIdx(nextIdx);
+      setOvRound(1);
+      setOvPhase('prep');
+    }
+  };
+
+  const currentStepFromOv = isGuided && activeWorkout.steps[ovStepIdx] ? activeWorkout.steps[ovStepIdx] : null;
+
+  const getCustomTag = () => {
+    const phaseLabel = ovPhase.toUpperCase();
+    if (isGuided && currentStepFromOv) {
+      return `[Step ${ovStepIdx + 1}/${activeWorkout.steps.length} · ${currentStepFromOv.name} · R${ovRound} · ${phaseLabel}]`;
+    }
+    return `[Round ${ovRound} · ${phaseLabel}]`;
+  };
+
   const handleSave = () => {
     if (!noteText.trim()) return;
-    const tag = getNoteTag();
+    const tag = getCustomTag();
     addSessionNote({
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
@@ -23,33 +122,90 @@ function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
     setIsOpen(false);
   };
 
-  if (phase === 'stopped') return null;
+  if (phase === 'stopped' && !isOpen) return null;
 
   return (
     <div className="note-bubble-container">
       {isOpen && (
         <div className="note-panel">
           <div className="note-panel-header">
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Session Notes</span>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Nota Sessione</span>
             <button className="btn-icon" onClick={() => setIsOpen(false)}><X size={18}/></button>
           </div>
           <div className="note-panel-body">
+            
+            {/* NEW Timeline Navigation */}
+            <div className="note-timeline-nav">
+              <button className="nav-arrow" onClick={noteSkipBack} title="Back in timeline">
+                <SkipBack size={18} />
+              </button>
+              
+              <div className="nav-context-pill">
+                <span className="pill-primary">R{ovRound} {ovPhase.toUpperCase()}</span>
+                {isGuided && currentStepFromOv && (
+                  <span className="pill-secondary">
+                    Step {ovStepIdx + 1}/{activeWorkout.steps.length}: {currentStepFromOv.name}
+                  </span>
+                )}
+              </div>
+
+              <button 
+                className="nav-arrow" 
+                onClick={noteSkipForward}
+                disabled={
+                  isGuided 
+                    ? (ovStepIdx === activeWorkout.steps.length - 1 && 
+                       ovRound === (activeWorkout.steps[ovStepIdx].rounds || activeWorkout.steps[ovStepIdx].sets || 1) && 
+                       ovPhase === 'rest')
+                    : (ovRound === totalRounds && ovPhase === 'rest')
+                }
+                title="Forward in timeline"
+              >
+                <SkipForward size={18} />
+              </button>
+            </div>
+
+            <div className="note-context-selectors mini">
+              {isGuided && (
+                <div className="selector-group">
+                  <select 
+                    value={ovStepIdx} 
+                    onChange={e => {
+                      setIsAutoSync(false);
+                      const newIdx = parseInt(e.target.value);
+                      setOvStepIdx(newIdx);
+                      const max = activeWorkout.steps[newIdx]?.rounds || 1;
+                      if (ovRound > max) setOvRound(max);
+                    }}
+                    className="step-select small"
+                  >
+                    {activeWorkout.steps.map((s, i) => (
+                      <option key={s.id || i} value={i}>{i+1}. {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="tag-preview">{getCustomTag()}</div>
+
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <textarea 
-              autoFocus
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Scrivi una nota..."
-              style={{ flex: 1, padding: '0.5rem', fontSize: '0.9rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', minHeight: '80px', resize: 'none' }}
-            />
-          </div>
-          <button className="btn-primary w-full" onClick={handleSave} disabled={!noteText.trim()}>
-            Salva Nota
-          </button>
+              <textarea 
+                autoFocus
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Scrivi cosa è successo..."
+                className="note-textarea-box"
+              />
+            </div>
+            <button className="btn-primary w-full" onClick={handleSave} disabled={!noteText.trim()}>
+              Salva Nota
+            </button>
             
             {sessionNotes.length > 0 && (
               <div className="note-history">
-                {sessionNotes.map(note => (
+                <div className="history-title">Note recenti:</div>
+                {sessionNotes.slice(-3).reverse().map(note => (
                   <div key={note.id} className="note-history-item">
                     <span className="note-item-tag">{note.tag}</span>
                     {note.text}
@@ -64,7 +220,7 @@ function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
       <button className="note-bubble" onClick={() => setIsOpen(!isOpen)}>
         <StickyNote size={20} />
         {sessionNotes.length > 0 && (
-          <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{sessionNotes.length}</span>
+          <span className="note-count-badge">{sessionNotes.length}</span>
         )}
       </button>
     </div>

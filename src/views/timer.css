@@ -249,78 +249,161 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.note-panel-body {
-  padding: 1rem;
+/* Note Timeline Navigation */
+.note-timeline-nav {
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 0.75rem;
 }
 
-.note-textarea {
+.nav-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-arrow:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--primary); }
+.nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.nav-context-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.pill-primary {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pill-secondary {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.note-context-selectors.mini {
+  background: transparent;
+  padding: 0;
+  border: none;
+  margin-bottom: 0.5rem;
+}
+
+.step-select.small {
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  height: 28px;
+}
+
+.phase-chips {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.phase-chip {
+  flex: 1;
+  padding: 0.4rem;
+  border-radius: 4px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.phase-chip.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.tag-preview {
+  font-size: 0.75rem;
+  color: var(--primary);
+  font-weight: 700;
+  background: rgba(220, 38, 38, 0.1);
+  padding: 0.4rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.note-textarea-box {
   width: 100%;
   min-height: 80px;
   background: rgba(0,0,0,0.3);
   border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
+  border-radius: 4px;
   padding: 0.75rem;
   color: var(--text-main);
   font-size: 0.9rem;
   resize: none;
 }
 
-.note-input-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.note-history {
-  max-height: 150px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.note-history-item {
-  font-size: 0.8rem;
+.note-panel {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  width: 300px; /* Slightly wider for the select/buttons */
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 12px;
   padding: 0.5rem;
-  background: rgba(255,255,255,0.03);
-  border-radius: 0.25rem;
-  border-left: 2px solid var(--primary);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+  z-index: 1;
+  transform-origin: bottom right;
 }
 
-.note-item-tag {
-  color: var(--primary);
-  font-weight: 600;
-  margin-bottom: 2px;
-  display: block;
-}
-
-.mic-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
+.note-count-badge {
+  background: var(--primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-hover);
+  padding: 0 4px;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  border: 2px solid var(--surface);
+}
+
+.history-title {
+  font-size: 0.7rem;
+  font-weight: 700;
   color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  transition: all 0.2s;
-}
-
-.mic-btn.recording {
-  background: var(--primary);
-  color: white;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
 }
 
 @media (max-width: 600px) {

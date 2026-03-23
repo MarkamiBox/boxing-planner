@@ -480,7 +480,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       soundEnabled, setSoundEnabled,
       work, setWork, rest, setRest, totalRounds, setTotalRounds,
       isRunning, phase, timeLeft, currentRound, currentStepIdx,
-      isGuided, currentStep,
+      isGuided, currentStep, activeWorkout,
       getPhaseColor, getPhaseLabel, getNoteTag,
       
       // Actions
