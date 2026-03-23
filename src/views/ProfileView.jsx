@@ -446,12 +446,29 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           </select>
         </div>
         <div className="form-group">
-          <label>Primary Punch</label>
-          <input type="text" value={localProfile.primaryPunch} onChange={e => handleChange('primaryPunch', e.target.value)} />
-        </div>
-        <div className="form-group">
           <label>Prep Time Between Exercises (sec)</label>
           <input type="number" value={localProfile.prepTime !== undefined ? localProfile.prepTime : 10} onChange={e => handleChange('prepTime', Number(e.target.value))} />
+        </div>
+
+        <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Timer & Notes</h3>
+
+        <div className="form-group">
+          <label>Voice Trigger Word</label>
+          <input type="text" value={localProfile.voiceTriggerWord || 'nota'} onChange={e => handleChange('voiceTriggerWord', e.target.value)} placeholder="e.g. nota" />
+        </div>
+        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem', height: '100%', paddingTop: '1.5rem' }}>
+          <label style={{ margin: 0 }}>Voice Notes</label>
+          <label className="switch">
+            <input 
+              type="checkbox" 
+              checked={localProfile.voiceNotesEnabled !== false} 
+              onChange={e => handleChange('voiceNotesEnabled', e.target.checked)}
+            />
+            <span className="slider-toggle"></span>
+          </label>
+          <span style={{ fontSize: '0.85rem', color: localProfile.voiceNotesEnabled !== false ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>
+            {localProfile.voiceNotesEnabled !== false ? 'ON' : 'OFF'}
+          </span>
         </div>
 
         <h3 className="section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>Technical Levels (1-5)</h3>

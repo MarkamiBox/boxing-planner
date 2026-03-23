@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy } from 'lucide-react';
+import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId, calculateDuration } from '../utils';
@@ -111,7 +111,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       type: exercise.type,
       notes: exercise.notes || '',
       plannedTime: exercise.plannedTime || '',
-      steps: exercise.steps ? JSON.parse(JSON.stringify(exercise.steps)) : []
+      steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) })) : []
     });
   };
 
@@ -229,6 +229,13 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       done: false,
     }));
 
+    // Ensure steps have IDs
+    normalised.forEach(ex => {
+      if (ex.steps) {
+        ex.steps = ex.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) }));
+      }
+    });
+
     const newSchedule = { ...schedule };
     newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
     setSchedule(newSchedule);
@@ -283,10 +290,22 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     setEditForm({ ...editForm, steps: newSteps });
   };
 
+  const moveStep = (idx, dir) => {
+    const newSteps = [...editForm.steps];
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= newSteps.length) return;
+    [newSteps[idx], newSteps[targetIdx]] = [newSteps[targetIdx], newSteps[idx]];
+    setEditForm({ ...editForm, steps: newSteps });
+  };
+
   const renderStepEditor = (step, idx) => {
     return (
-      <div key={idx} className="step-edit-card" style={{ background: 'var(--bg-color)', padding: '0.75rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      <div key={step.id} className="step-edit-card" style={{ background: 'var(--bg-color)', padding: '0.75rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <button onClick={() => moveStep(idx, -1)} disabled={idx === 0} style={{ color: idx === 0 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowUp size={16}/></button>
+            <button onClick={() => moveStep(idx, 1)} disabled={idx === editForm.steps.length - 1} style={{ color: idx === editForm.steps.length - 1 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === editForm.steps.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowDown size={16}/></button>
+          </div>
           <select value={step.type} onChange={e => updateStep(idx, 'type', e.target.value)} style={{ flex: 1, padding: '4px', fontSize: '0.85rem' }}>
             <option value="timer">Timer (Auto)</option>
             <option value="manual_timer">Timer (Manual Wait)</option>

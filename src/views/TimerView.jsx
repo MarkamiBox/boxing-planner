@@ -1,10 +1,116 @@
-import React from 'react';
-import { Play, Pause, Square, Volume2, VolumeX, CheckCircle, SkipForward, SkipBack, X } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause, Square, Volume2, VolumeX, CheckCircle, SkipForward, SkipBack, X, Mic, StickyNote } from 'lucide-react';
 import { useTimer } from '../components/TimerContext';
 import { formatTime } from '../utils';
 import './timer.css';
 
-export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout, setActiveTab }) {
+function FloatingNoteBubble({ addSessionNote, sessionNotes }) {
+  const { phase, getNoteTag, isRunning } = useTimer();
+  const [isOpen, setIsOpen] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      setSpeechSupported(false);
+    }
+  }, []);
+
+  const handleSave = () => {
+    if (!noteText.trim()) return;
+    const tag = getNoteTag();
+    addSessionNote({
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      tag,
+      text: noteText.trim(),
+      raw: `${tag} ${noteText.trim()}`
+    });
+    setNoteText('');
+    setIsOpen(false);
+  };
+
+  const startVoiceNote = () => {
+    if (!speechSupported) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || 'it-IT';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsRecording(true);
+    recognition.onend = () => setIsRecording(false);
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setNoteText(prev => prev ? prev + ' ' + transcript : transcript);
+    };
+
+    recognition.start();
+  };
+
+  if (phase === 'stopped') return null;
+
+  return (
+    <div className="note-bubble-container">
+      {isOpen && (
+        <div className="note-panel">
+          <div className="note-panel-header">
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Session Notes</span>
+            <button className="btn-icon" onClick={() => setIsOpen(false)}><X size={18}/></button>
+          </div>
+          <div className="note-panel-body">
+            <textarea 
+              className="note-textarea"
+              placeholder="Type your note..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              autoFocus
+            />
+            <div className="note-input-actions">
+              <button 
+                className={`mic-btn ${isRecording ? 'recording' : ''}`}
+                onClick={startVoiceNote}
+                title={speechSupported ? "Record voice note" : "Voice not supported"}
+                disabled={!speechSupported || isRecording}
+              >
+                <Mic size={20} />
+              </button>
+              <button 
+                className="btn-primary" 
+                style={{ flex: 1 }} 
+                onClick={handleSave}
+                disabled={!noteText.trim()}
+              >
+                Save Note
+              </button>
+            </div>
+            
+            {sessionNotes.length > 0 && (
+              <div className="note-history">
+                {sessionNotes.map(note => (
+                  <div key={note.id} className="note-history-item">
+                    <span className="note-item-tag">{note.tag}</span>
+                    {note.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      <button className="note-bubble" onClick={() => setIsOpen(!isOpen)}>
+        <StickyNote size={20} />
+        {sessionNotes.length > 0 && (
+          <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{sessionNotes.length}</span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout, setActiveTab, sessionNotes, addSessionNote }) {
   const {
     soundEnabled, setSoundEnabled,
     work, setWork, rest, setRest, totalRounds, setTotalRounds,
@@ -119,8 +225,8 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
           ) : (
             <div className="time-huge">
               {phase === 'stopped' && !isGuided ? formatTime(work) : 
-               phase === 'stopped' && isGuided && currentStep?.type === 'timer' ? formatTime(currentStep.duration) :
-               formatTime(timeLeft)}
+                phase === 'stopped' && isGuided && currentStep?.type === 'timer' ? formatTime(currentStep.duration) :
+                formatTime(timeLeft)}
             </div>
           )}
         </div>
@@ -144,7 +250,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
           {!isRunning ? (
             <button className="timer-btn play" onClick={startTimer}><Play size={32} /></button>
           ) : (
-             <button className="timer-btn pause" onClick={pauseTimer}><Pause size={32} /></button>
+              <button className="timer-btn pause" onClick={pauseTimer}><Pause size={32} /></button>
           )}
           <button className="timer-btn stop" onClick={stopTimer}><Square size={32} /></button>
 
@@ -183,6 +289,8 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
           </div>
         </div>
       )}
+
+      <FloatingNoteBubble addSessionNote={addSessionNote} sessionNotes={sessionNotes} />
     </div>
   );
 }

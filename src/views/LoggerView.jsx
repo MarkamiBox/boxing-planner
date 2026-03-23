@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain } from 'lucide-react';
+import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain, StickyNote } from 'lucide-react';
 import { calculateDuration } from '../utils';
 import './logger.css';
 
-export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext }) {
+export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext, sessionNotes, clearSessionNotes }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
   const recentLogWithWeight = logs?.find(l => l.bodyWeight);
@@ -26,6 +26,13 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
   const [focus, setFocus] = useState(7);
 
   const [notes, setNotes] = useState(activeWorkout ? `Completed: ${activeWorkout.name}` : '');
+  const [combinedSessionNotes, setCombinedSessionNotes] = useState('');
+
+  useEffect(() => {
+    if (sessionNotes && sessionNotes.length > 0 && !combinedSessionNotes) {
+      setCombinedSessionNotes(sessionNotes.map(n => n.raw).join('\n'));
+    }
+  }, [sessionNotes]);
 
   // Running specific
   const [distance, setDistance] = useState('');
@@ -290,6 +297,35 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Qualità Sonno</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{sleepQuality}/10</span></div>
           <input type="range" min="1" max="10" value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '0.25rem' }} />
         </div>
+
+        {sessionNotes && sessionNotes.length > 0 && (
+          <div className="session-notes-import-card" style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid var(--primary)', borderRadius: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <StickyNote size={16} /> Session Notes ({sessionNotes.length})
+              </span>
+              <button type="button" className="btn-text danger" onClick={clearSessionNotes} style={{ fontSize: '0.8rem', color: '#ef4444', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>Discard</button>
+            </div>
+            <textarea 
+              rows="4"
+              value={combinedSessionNotes}
+              onChange={(e) => setCombinedSessionNotes(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)', marginBottom: '0.75rem', fontFamily: 'monospace', resize: 'vertical' }}
+            />
+            <button 
+              type="button" 
+              className="btn-secondary w-full" 
+              style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+              onClick={() => {
+                setNotes(prev => prev ? prev + '\n\n' + combinedSessionNotes : combinedSessionNotes);
+                clearSessionNotes();
+                setCombinedSessionNotes('');
+              }}
+            >
+              Import into Notes ↓
+            </button>
+          </div>
+        )}
 
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}><span>Note (opzionale)</span></div>

@@ -36,7 +36,7 @@ export const playBeep = (type = 'short', noSound = false) => {
   }
 };
 
-export function TimerProvider({ children, activeWorkout, setActiveWorkout, setActiveTab, globalPrepTime = 10 }) {
+export function TimerProvider({ children, activeWorkout, setActiveWorkout, setActiveTab, globalPrepTime = 10, profile, addSessionNote }) {
   const { showConfirm } = useDialog();
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -61,6 +61,103 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
 
   const isGuided = activeWorkout && activeWorkout.steps && activeWorkout.steps.length > 0;
   const currentStep = isGuided ? activeWorkout.steps[currentStepIdx] : null;
+
+  // Auto-tagging helper
+  const getNoteTag = () => {
+    const phaseLabel = phase.toUpperCase();
+    if (isGuided && currentStep) {
+      return `[Step ${currentStepIdx + 1}/${activeWorkout.steps.length} · ${currentStep.name} · Round ${currentRound} · ${phaseLabel}]`;
+    }
+    const totalRnds = !isGuided ? totalRounds : (currentStep?.rounds || 1);
+    return `[Round ${currentRound}/${totalRnds} · ${phaseLabel}]`;
+  };
+
+  // Refs for stable access in callbacks
+  const voiceSettings = useRef({ enabled: true, trigger: 'nota' });
+  const processedResultsRef = useRef(0);
+
+  useEffect(() => {
+    voiceSettings.current = {
+      enabled: profile?.voiceNotesEnabled !== false,
+      trigger: (profile?.voiceTriggerWord || 'nota').toLowerCase()
+    };
+  }, [profile?.voiceNotesEnabled, profile?.voiceTriggerWord]);
+
+  // Always-on Voice Listener
+  useEffect(() => {
+    let recognition = null;
+    const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    
+    // Only start if supported and we are in an active workout state
+    if (!isSupported || !isRunning || phase === 'stopped') return;
+
+    const startRecognition = () => {
+      if (!voiceSettings.current.enabled) return;
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = navigator.language || 'it-IT';
+
+      recognition.onresult = (event) => {
+        // Iterate only through new results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript.toLowerCase().trim();
+            const trigger = voiceSettings.current.trigger;
+
+            if (transcript.includes(trigger)) {
+              // Found trigger! Capture everything after it
+              const parts = transcript.split(trigger);
+              const noteText = parts[parts.length - 1].trim();
+              
+              if (noteText) {
+                const tag = getNoteTag();
+                addSessionNote({
+                  id: Date.now().toString(),
+                  timestamp: new Date().toISOString(),
+                  tag,
+                  text: noteText,
+                  raw: `${tag} ${noteText}`
+                });
+                playBeep('short', !soundEnabled);
+              }
+            }
+          }
+        }
+      };
+
+      recognition.onerror = (err) => {
+        if (err.error !== 'no-speech') console.error("Speech Recognition Error:", err.error);
+        if (err.error === 'not-allowed') voiceSettings.current.enabled = false; // Stop trying if permission denied
+      };
+
+      recognition.onend = () => {
+        // Restart only if still working out AND settings still allow it
+        if (isRunning && phase !== 'stopped' && voiceSettings.current.enabled) {
+          try { recognition.start(); } catch(e) {}
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error("Speech recognition start failed", e);
+      }
+    };
+
+    if (voiceSettings.current.enabled) {
+      startRecognition();
+    }
+
+    return () => {
+      if (recognition) {
+        recognition.onend = null; // Prevent restart on cleanup
+        try { recognition.stop(); } catch(e) {}
+      }
+    };
+  }, [isRunning, phase, isGuided, currentStepIdx, currentRound, soundEnabled, addSessionNote]);
 
   // Restore state on mount
   useEffect(() => {
@@ -470,7 +567,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       work, setWork, rest, setRest, totalRounds, setTotalRounds,
       isRunning, phase, timeLeft, currentRound, currentStepIdx,
       isGuided, currentStep,
-      getPhaseColor, getPhaseLabel,
+      getPhaseColor, getPhaseLabel, getNoteTag,
       
       // Actions
       startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet, advanceGuidedStep,

@@ -16,12 +16,18 @@ import { GlobalTimerBar } from './components/GlobalTimerBar';
 function AppContent() {
   const [activeTab, setActiveTab] = useIdbStorage('bxng_active_tab', 'schedule');
   const appState = useAppState();
+  const [sessionNotes, setSessionNotes] = useState([]);
+
+  const addSessionNote = (note) => {
+    setSessionNotes(prev => [note, ...prev]);
+  };
+  const clearSessionNotes = () => setSessionNotes([]);
 
   const renderView = () => {
     switch (activeTab) {
       case 'schedule': return <ScheduleView schedule={appState.schedule} setSchedule={appState.setSchedule} weeks={appState.weeks} setWeeks={appState.setWeeks} currentWeekId={appState.currentWeekId} setCurrentWeekId={appState.setCurrentWeekId} setActiveWorkout={appState.setActiveWorkout} setActiveTab={setActiveTab} logs={appState.logs} setLogs={appState.setLogs} />;
-      case 'timer': return <TimerView presets={appState.timerPresets} setPresets={appState.setTimerPresets} activeWorkout={appState.activeWorkout} setActiveWorkout={appState.setActiveWorkout} setActiveTab={setActiveTab} />;
-      case 'logger': return <LoggerView logs={appState.logs} setLogs={appState.setLogs} activeWorkout={appState.activeWorkout} setActiveWorkout={appState.setActiveWorkout} schedule={appState.schedule} setSchedule={appState.setSchedule} setActiveTab={setActiveTab} setPendingCoachContext={appState.setPendingCoachContext} />;
+      case 'timer': return <TimerView presets={appState.timerPresets} setPresets={appState.setTimerPresets} activeWorkout={appState.activeWorkout} setActiveWorkout={appState.setActiveWorkout} setActiveTab={setActiveTab} sessionNotes={sessionNotes} addSessionNote={addSessionNote} />;
+      case 'logger': return <LoggerView logs={appState.logs} setLogs={appState.setLogs} activeWorkout={appState.activeWorkout} setActiveWorkout={appState.setActiveWorkout} schedule={appState.schedule} setSchedule={appState.setSchedule} setActiveTab={setActiveTab} setPendingCoachContext={appState.setPendingCoachContext} sessionNotes={sessionNotes} clearSessionNotes={clearSessionNotes} />;
       case 'coach': return <CoachView profile={appState.profile} setProfile={appState.setProfile} schedule={appState.schedule} setSchedule={appState.setSchedule} weeks={appState.weeks} setWeeks={appState.setWeeks} currentWeekId={appState.currentWeekId} setCurrentWeekId={appState.setCurrentWeekId} logs={appState.logs} goals={appState.goals} setGoals={appState.setGoals} coachMemory={appState.coachMemory} setCoachMemory={appState.setCoachMemory} coachSettings={appState.coachSettings} setCoachSettings={appState.setCoachSettings} coachConversations={appState.coachConversations} setCoachConversations={appState.setCoachConversations} pendingCoachContext={appState.pendingCoachContext} setPendingCoachContext={appState.setPendingCoachContext} pendingTools={appState.pendingTools} setPendingTools={appState.setPendingTools} />;
       case 'stats': return <StatsView logs={appState.logs} setLogs={appState.setLogs} />;
       case 'profile': return <ProfileView profile={appState.profile} setProfile={appState.setProfile} logs={appState.logs} setLogs={appState.logs} goals={appState.goals} setGoals={appState.setGoals} />;
@@ -30,7 +36,14 @@ function AppContent() {
   };
 
   return (
-    <TimerProvider activeWorkout={appState.activeWorkout} setActiveWorkout={appState.setActiveWorkout} setActiveTab={setActiveTab} globalPrepTime={appState.profile?.prepTime !== undefined ? appState.profile.prepTime : 10}>
+    <TimerProvider 
+      activeWorkout={appState.activeWorkout} 
+      setActiveWorkout={appState.setActiveWorkout} 
+      setActiveTab={setActiveTab} 
+      globalPrepTime={appState.profile?.prepTime !== undefined ? appState.profile.prepTime : 10}
+      profile={appState.profile}
+      addSessionNote={addSessionNote}
+    >
       <div className="app-container">
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         <div className="main-content">

@@ -41,7 +41,7 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
   };
 
   const renderStep = (step, idx) => (
-    <div key={idx} className="step-edit-box" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div key={step.id} className="step-edit-box" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '2px' }}>
           <button onClick={() => moveStep(idx, 'up')} disabled={idx === 0} style={{ color: idx === 0 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowUp size={16}/></button>
