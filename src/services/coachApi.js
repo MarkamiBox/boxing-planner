@@ -718,7 +718,8 @@ Data suggests athlete may have reached a goal. Bring it up. Ask if they want to 
     1-6/10 (DOMS/Fatigue): Normal muscle work. The athlete just "felt the work" in this area. DO NOT modify the program. DO NOT treat as an injury.
     7/10 (High Fatigue): Monitor. Maybe reduce load on this specific area by 10-20% for the next session, but do NOT trigger injury protocol.
     8-10/10 (Severe/Sharp Pain): Real injury risk. Trigger full INJURY protocol. Modify week immediately.
-    Never escalate fatigue (≤7) to an injury just because it repeats. Repetitive DOMS is normal.`
+    Never escalate fatigue (≤7) to an injury just because it repeats. Repetitive DOMS is normal.
+11. INTERVAL & SETS INSTRUCTIONS — MANDATORY FORMAT: For ANY interval or sets step with 2+ rounds, the instruction field MUST use this exact format: 'R1: [specific cue] | R2: [specific cue] | R3: [specific cue]' with one cue per round, each different from the others. R1 = establish rhythm or technique focus. R2 = add intensity or tactical element. R3+ = maintain quality under fatigue or escalate challenge. NEVER write a single generic sentence for multi-round steps. If a step has 5 rounds write R1 through R5. The pipe separator | is mandatory between rounds. This applies to every tool call that creates or modifies sessions: create_next_week, add_exercise, modify_session.`
   ];
 
   return modules.filter(Boolean).join('\n\n');

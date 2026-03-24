@@ -40,6 +40,15 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
     }
   };
 
+  const handleInstructionChange = (stepIdx, roundIdx, newValue) => {
+    const step = form.steps[stepIdx];
+    const rounds = step.type === 'interval' ? (step.rounds || 1) : (step.sets || 1);
+    let parts = (step.instruction || '').split(' | ');
+    while (parts.length < rounds) parts.push('');
+    parts[roundIdx] = newValue;
+    updateStep(stepIdx, 'instruction', parts.join(' | '));
+  };
+
   const renderStep = (step, idx) => (
     <div key={step.id} className="step-edit-box" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
@@ -76,7 +85,26 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
           <TimeInput label="Rest" value={step.rest || 0} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
         </div>
       )}
-      <input type="text" placeholder="Istruzioni" value={step.instruction || ''} onChange={e => updateStep(idx, 'instruction', e.target.value)} style={{ width: '100%', marginTop: '0.4rem', padding: '4px', fontSize: '0.8rem' }} />
+      {((step.type === 'interval' && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.4rem' }}>
+          {Array.from({ length: (step.type === 'interval' ? step.rounds : step.sets) }).map((_, rIdx) => {
+            const parts = (step.instruction || '').split(' | ');
+            return (
+              <div key={rIdx} style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '1px' }}>Round {rIdx+1}</label>
+                <textarea 
+                  placeholder={`Istruzione round ${rIdx+1}`}
+                  value={parts[rIdx] || ''} 
+                  onChange={e => handleInstructionChange(idx, rIdx, e.target.value)}
+                  style={{ width: '100%', padding: '4px', fontSize: '0.75rem', background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '3px', minHeight: '30px', resize: 'vertical', color: 'inherit' }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <input type="text" placeholder="Istruzioni" value={step.instruction || ''} onChange={e => updateStep(idx, 'instruction', e.target.value)} style={{ width: '100%', marginTop: '0.4rem', padding: '4px', fontSize: '0.8rem' }} />
+      )}
     </div>
   );
 

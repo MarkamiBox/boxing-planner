@@ -6,6 +6,17 @@ export function executeToolCall(toolName, toolInput, appState) {
   const { schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId,
     profile, setProfile, goals, setGoals, coachMemory, setCoachMemory } = appState;
 
+  const sanitizeStep = (s, i) => ({
+    ...s,
+    id: s.id || `s${i + 1}`,
+    duration: s.duration !== undefined ? (Number(s.duration) || 0) : undefined,
+    work: s.work !== undefined ? (Number(s.work) || 0) : undefined,
+    rest: s.rest !== undefined ? (Number(s.rest) || 0) : undefined,
+    rounds: s.rounds !== undefined ? (Number(s.rounds) || 1) : undefined,
+    sets: s.sets !== undefined ? (Number(s.sets) || 1) : undefined,
+    prepTime: s.prepTime !== undefined ? (Number(s.prepTime) || 0) : undefined
+  });
+
   switch (toolName) {
 
     case 'create_next_week': {
@@ -27,7 +38,7 @@ export function executeToolCall(toolName, toolInput, appState) {
       for (const [day, exercises] of Object.entries(nextWeekSchedule)) {
         normalized[day] = (exercises || []).map(ex => {
           counter++;
-          const steps = (ex.steps || []).map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
+          const steps = (ex.steps || []).map(sanitizeStep);
           return {
             id: ex.id || (now + counter).toString(),
             type: ex.type || 'Boxing',
@@ -53,7 +64,7 @@ export function executeToolCall(toolName, toolInput, appState) {
       const newSchedule = { ...schedule };
       const newId = Date.now().toString();
 
-      const steps = (exercise.steps || []).map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
+      const steps = (exercise.steps || []).map(sanitizeStep);
       const newExercise = {
         id: newId,
         type: exercise.type || 'Boxing',
@@ -118,7 +129,7 @@ export function executeToolCall(toolName, toolInput, appState) {
         setSchedule(newSchedule);
         return { success: true, message: `Removed session.` };
       } else if (action === 'replace' && replacement) {
-        const steps = (replacement.steps || []).map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
+        const steps = (replacement.steps || []).map(sanitizeStep);
         newSchedule[d][exIdx] = {
           id: Date.now().toString(),
           type: replacement.type || 'Boxing',
@@ -133,7 +144,7 @@ export function executeToolCall(toolName, toolInput, appState) {
       } else if (action === 'update' && updates) {
         const target = newSchedule[d][exIdx];
         if (updates.steps) {
-          updates.steps = updates.steps.map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
+          updates.steps = updates.steps.map(sanitizeStep);
         }
         newSchedule[d][exIdx] = { ...target, ...updates };
         setSchedule(newSchedule);

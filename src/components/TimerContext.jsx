@@ -110,13 +110,26 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     }
   }, [phase, isRunning, currentRound, currentStepIdx, timeLeft, isGuided]);
 
+  const lastWorkoutRef = useRef(null);
+
   useEffect(() => {
-    // If we receive a new activeWorkout, reset the sequence and compute planned duration
+    // If we receive a new workout or the user clicks "Play" again (different playTime), reset
+    if (activeWorkout && (activeWorkout.id !== lastWorkoutRef.current?.id || activeWorkout.playTime !== lastWorkoutRef.current?.playTime)) {
+      setPhase('stopped');
+      setIsRunning(false);
+      setCurrentStepIdx(0);
+      setCurrentRound(1);
+      lastWorkoutRef.current = activeWorkout;
+    }
+  }, [activeWorkout]);
+
+  useEffect(() => {
+    // Re-init sequence parameters when workout is fresh or reset
     if (isGuided && phase === 'stopped' && currentStepIdx === 0) {
       plannedDuration.current = activeWorkout.steps.reduce((acc, step) => {
-        if (step.type === 'timer' || step.type === 'manual_timer') return acc + step.duration;
-        if (step.type === 'interval') return acc + ((step.work + step.rest) * step.rounds);
-        if (step.type === 'sets') return acc + (step.rest * step.sets);
+        if (step.type === 'timer' || step.type === 'manual_timer') return acc + (step.duration || 0);
+        if (step.type === 'interval') return acc + (((step.work || 0) + (step.rest || 0)) * (step.rounds || 1));
+        if (step.type === 'sets') return acc + ((step.rest || 60) * (step.sets || 1));
         return acc;
       }, 0);
       statsTracker.current = { actualDuration: 0, skippedSteps: 0, lastActive: null };

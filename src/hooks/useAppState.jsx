@@ -164,7 +164,7 @@ export function useAppState() {
   const [currentWeekId, setCurrentWeekId] = useIdbStorage('bxng_current_week', null);
   const [timerPresets, setTimerPresets, resetTimerPresets] = useIdbStorage('bxng_timer_presets', initialTimerPresets);
   const [logs, setLogs] = useIdbStorage('bxng_logs', []);
-  const [activeWorkout, setActiveWorkout] = useState(null);
+  const [activeWorkout, setActiveWorkout] = useIdbStorage('bxng_active_workout', null);
   const [goals, setGoals] = useIdbStorage('bxng_goals', []);
   const [coachConversations, setCoachConversations] = useIdbStorage('bxng_coach_conversations', []);
   const [coachMemory, setCoachMemory] = useIdbStorage('bxng_coach_memory', {

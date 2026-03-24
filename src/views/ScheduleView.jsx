@@ -298,6 +298,17 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
     setEditForm({ ...editForm, steps: newSteps });
   };
 
+  const handleInstructionChange = (stepIdx, roundIdx, newValue) => {
+    const newSteps = [...editForm.steps];
+    const step = newSteps[stepIdx];
+    const rounds = step.type === 'interval' ? (step.rounds || 1) : (step.sets || 1);
+    let parts = (step.instruction || '').split(' | ');
+    while (parts.length < rounds) parts.push('');
+    parts[roundIdx] = newValue;
+    newSteps[stepIdx] = { ...step, instruction: parts.join(' | ') };
+    setEditForm({ ...editForm, steps: newSteps });
+  };
+
   const renderStepEditor = (step, idx) => {
     return (
       <div key={step.id} className="step-edit-card" style={{ background: 'var(--bg-color)', padding: '0.75rem', borderRadius: '4px', marginBottom: '0.5rem', border: '1px solid var(--border-color)' }}>
@@ -352,7 +363,26 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
            </div>
         )}
 
-        <input type="text" placeholder="Instructions/Notes" value={step.instruction || ''} onChange={e => updateStep(idx, 'instruction', e.target.value)} style={{ width: '100%', padding: '6px', fontSize: '0.85rem' }} />
+        {((step.type === 'interval' && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
+           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+             {Array.from({ length: (step.type === 'interval' ? step.rounds : step.sets) }).map((_, rIdx) => {
+               const parts = (step.instruction || '').split(' | ');
+               return (
+                 <div key={rIdx} style={{ display: 'flex', flexDirection: 'column' }}>
+                   <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '1px' }}>Round {rIdx+1}</label>
+                   <textarea 
+                     placeholder={`Step instruction round ${rIdx+1}`}
+                     value={parts[rIdx] || ''} 
+                     onChange={e => handleInstructionChange(idx, rIdx, e.target.value)}
+                     style={{ width: '100%', padding: '6px', fontSize: '0.75rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '4px', minHeight: '35px', resize: 'vertical', color: 'inherit' }}
+                   />
+                 </div>
+               );
+             })}
+           </div>
+        ) : (
+          <input type="text" placeholder="Instructions/Notes" value={step.instruction || ''} onChange={e => updateStep(idx, 'instruction', e.target.value)} style={{ width: '100%', padding: '6px', fontSize: '0.85rem' }} />
+        )}
       </div>
     );
   };
@@ -573,7 +603,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                         className="btn-icon"
                         style={{ backgroundColor: 'var(--primary)', color: 'white', borderColor: 'var(--primary)' }}
                         onClick={() => {
-                          setActiveWorkout({ ...ex, sourceDay: activeDay });
+                          setActiveWorkout({ ...ex, sourceDay: activeDay, playTime: Date.now() });
                           setActiveTab('timer');
                         }}
                       >
