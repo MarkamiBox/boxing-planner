@@ -3,9 +3,12 @@ import { X, Trash2, Plus } from 'lucide-react';
 
 const CATEGORIES = [
   { key: 'preferences', label: 'Preferences', desc: 'Things you like/dislike' },
-  { key: 'patterns', label: 'Patterns', desc: 'Observed from your data' },
-  { key: 'decisions', label: 'Decisions', desc: 'Changes the coach made and why' },
-  { key: 'progress_notes', label: 'Progress Notes', desc: 'Improvement observations' }
+  { key: 'observations', label: 'Observations', desc: 'Patterns noticed in performance' },
+  { key: 'decisions', label: 'Decisions', desc: 'Periodization and changes made' },
+  { key: 'injuries', label: 'Injuries', desc: 'Current/past injuries and severity' },
+  // Keep legacy options to display old data
+  { key: 'patterns', label: 'Patterns (Legacy)', desc: '' },
+  { key: 'progress_notes', label: 'Progress (Legacy)', desc: '' }
 ];
 
 export function CoachMemoryPanel({ coachMemory, setCoachMemory, onClose }) {
@@ -71,10 +74,12 @@ export function CoachMemoryPanel({ coachMemory, setCoachMemory, onClose }) {
         {/* Memory entries by category */}
         {CATEGORIES.map(cat => {
           const entries = coachMemory[cat.key] || [];
+          if (entries.length === 0 && (cat.key === 'patterns' || cat.key === 'progress_notes')) return null; // Hide legacy if empty
+
           return (
             <div key={cat.key} className="coach-memory-category">
               <h4>{cat.label} ({entries.length})</h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{cat.desc}</p>
+              {cat.desc && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{cat.desc}</p>}
               {entries.length === 0 ? (
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Empty</p>
               ) : (

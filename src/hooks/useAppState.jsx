@@ -33,7 +33,7 @@ const initialTimerPresets = [
 
 const initialSchedule = {
   monday: [
-    { 
+    {
       id: 'm1', type: 'Running', name: 'Roadwork Parco (45 min)', done: false, notes: '17:00 - Corsa leggera',
       steps: [
         { id: 's1', type: 'timer', duration: 600, name: 'Riscaldamento', instruction: 'Corsa molto lenta' },
@@ -43,20 +43,22 @@ const initialSchedule = {
     }
   ],
   tuesday: [
-    { 
+    {
       id: 't1', type: 'Boxing', name: 'Palestra: Fondamentali', done: false, notes: 'Corso Tecnico (18:00)',
       steps: [{ id: 's1', type: 'text', name: 'Allenamento di Classe', instruction: 'Segui le istruzioni del maestro.' }]
     }
   ],
   wednesday: [
-    { id: 'w1', type: 'Recovery', name: 'Mobilità Casa', done: false, notes: '20 min',
+    {
+      id: 'w1', type: 'Recovery', name: 'Mobilità Casa', done: false, notes: '20 min',
       steps: [
         { id: 's1', type: 'manual_timer', duration: 1200, name: 'Routine Mobilità', instruction: 'Rotazioni articolari e stretching dinamico.' }
       ]
     }
   ],
   thursday: [
-    { id: 'th1', type: 'Boxing', name: 'Sacco & Shadow Palestra', done: false, notes: 'Focus: Jab e Distanza',
+    {
+      id: 'th1', type: 'Boxing', name: 'Sacco & Shadow Palestra', done: false, notes: 'Focus: Jab e Distanza',
       steps: [
         { id: 's1', type: 'interval', work: 180, rest: 60, rounds: 3, name: 'Shadow Boxing', instruction: 'Focus su footwork e jab.' },
         { id: 's2', type: 'interval', work: 180, rest: 60, rounds: 4, name: 'Lavoro al Sacco', instruction: 'R1-2: Jab. R3-4: Combinazioni base.' }
@@ -64,7 +66,8 @@ const initialSchedule = {
     }
   ],
   friday: [
-    { id: 'f1', type: 'Strength', name: 'Circuito Forza Casa', done: false, notes: 'Corpo libero',
+    {
+      id: 'f1', type: 'Strength', name: 'Circuito Forza Casa', done: false, notes: 'Corpo libero',
       steps: [
         { id: 's1', type: 'sets', sets: 3, reps: '10', rest: 60, name: 'Pushups' },
         { id: 's2', type: 'sets', sets: 3, reps: '15', rest: 60, name: 'Squats' },
@@ -73,7 +76,8 @@ const initialSchedule = {
     }
   ],
   saturday: [
-    { id: 's1', type: 'Boxing', name: 'Sessione Libera Palestra', done: false, notes: 'Ripasso tecnico e sacco',
+    {
+      id: 's1', type: 'Boxing', name: 'Sessione Libera Palestra', done: false, notes: 'Ripasso tecnico e sacco',
       steps: [
         { id: 's1', type: 'text', name: 'Workout Libero', instruction: 'Lavora sui tuoi punti deboli.' }
       ]
@@ -92,26 +96,26 @@ export function AppStateProvider({ children }) {
 
   useEffect(() => {
     async function init() {
-       let migrated = window.localStorage.getItem('bxng_migrated_idb');
-       if (!migrated) {
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key && key.startsWith('bxng_')) {
-               try { await set(key, JSON.parse(window.localStorage.getItem(key))); } catch(e){}
-            }
+      let migrated = window.localStorage.getItem('bxng_migrated_idb');
+      if (!migrated) {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith('bxng_')) {
+            try { await set(key, JSON.parse(window.localStorage.getItem(key))); } catch (e) { }
           }
-          window.localStorage.setItem('bxng_migrated_idb', 'true');
-       }
+        }
+        window.localStorage.setItem('bxng_migrated_idb', 'true');
+      }
 
-       const dbKeys = await keys();
-       const loaded = {};
-       for (const key of dbKeys) {
-         if (key.startsWith('bxng_')) {
-           loaded[key] = await get(key);
-         }
-       }
-       setStore(loaded);
-       setIsLoaded(true);
+      const dbKeys = await keys();
+      const loaded = {};
+      for (const key of dbKeys) {
+        if (key.startsWith('bxng_')) {
+          loaded[key] = await get(key);
+        }
+      }
+      setStore(loaded);
+      setIsLoaded(true);
     }
     init();
   }, []);
@@ -136,7 +140,7 @@ export function useIdbStorage(key, initialValue) {
   const ctx = useContext(AppStateStoreContext);
   if (!ctx) throw new Error("useIdbStorage must be used within AppStateProvider");
   const { store, setStore } = ctx;
-  
+
   const storedValue = store[key] !== undefined ? store[key] : initialValue;
 
   const setValue = (value) => {
@@ -144,10 +148,10 @@ export function useIdbStorage(key, initialValue) {
     setStore(prev => ({ ...prev, [key]: valueToStore }));
     set(key, valueToStore).catch(err => console.error("IDB Save Error", err));
   };
-  
+
   const resetValue = () => {
     setStore(prev => ({ ...prev, [key]: initialValue }));
-    set(key, initialValue).catch(() => {});
+    set(key, initialValue).catch(() => { });
   };
 
   return [storedValue, setValue, resetValue];
@@ -164,21 +168,22 @@ export function useAppState() {
   const [goals, setGoals] = useIdbStorage('bxng_goals', []);
   const [coachConversations, setCoachConversations] = useIdbStorage('bxng_coach_conversations', []);
   const [coachMemory, setCoachMemory] = useIdbStorage('bxng_coach_memory', {
-    preferences: [], patterns: [], decisions: [], progress_notes: []
+    preferences: [], observations: [], decisions: [], injuries: [], patterns: [], progress_notes: []
   });
   const [coachSettings, setCoachSettings] = useIdbStorage('bxng_coach_settings', {
     apiKey: '', model: 'claude-sonnet-4-20250514', anthropicKey: '', openrouterKey: '', googleKey: '', activeProvider: 'anthropic'
   });
+  const [pendingWeekProposal, setPendingWeekProposal] = useIdbStorage('bxng_pending_week_proposal', null);
   const [pendingTools, setPendingTools] = useState(null);
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
 
   useEffect(() => {
     const todayWeekId = getWeekId();
     if (!weeks) {
-       setWeeks({ [todayWeekId]: initialSchedule });
-       setCurrentWeekId(todayWeekId);
+      setWeeks({ [todayWeekId]: initialSchedule });
+      setCurrentWeekId(todayWeekId);
     } else if (!currentWeekId) {
-       setCurrentWeekId(todayWeekId);
+      setCurrentWeekId(todayWeekId);
     }
     if (appVersion !== APP_VERSION) {
       setWeeks({ [todayWeekId]: initialSchedule });
@@ -206,6 +211,7 @@ export function useAppState() {
     coachConversations, setCoachConversations,
     coachMemory, setCoachMemory,
     coachSettings, setCoachSettings,
+    pendingWeekProposal, setPendingWeekProposal,
     pendingCoachContext, setPendingCoachContext,
     pendingTools, setPendingTools
   };

@@ -13,10 +13,10 @@ function renderMarkdown(text) {
   if (!text) return null;
   const lines = text.split('\n');
   const result = [];
-  
+
   lines.forEach((line, lineIdx) => {
     if (lineIdx > 0) result.push(<br key={`br-${lineIdx}`} />);
-    
+
     const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
     if (headerMatch) {
       const level = headerMatch[1].length;
@@ -39,7 +39,7 @@ function renderMarkdown(text) {
 
     result.push(<span key={`text-${lineIdx}`}>{renderMarkdownInline(line)}</span>);
   });
-  
+
   return result;
 }
 
@@ -49,10 +49,10 @@ function renderMarkdownInline(line) {
   let lastIdx = 0;
   let match;
   while ((match = regex.exec(line)) !== null) {
-      if (match.index > lastIdx) result.push(line.slice(lastIdx, match.index));
-      if (match[1] !== undefined) result.push(<strong key={`b-${match.index}`}>{match[1]}</strong>);
-      else result.push(<em key={`i-${match.index}`}>{match[2]}</em>);
-      lastIdx = match.index + match[0].length;
+    if (match.index > lastIdx) result.push(line.slice(lastIdx, match.index));
+    if (match[1] !== undefined) result.push(<strong key={`b-${match.index}`}>{match[1]}</strong>);
+    else result.push(<em key={`i-${match.index}`}>{match[2]}</em>);
+    lastIdx = match.index + match[0].length;
   }
   if (lastIdx < line.length) result.push(line.slice(lastIdx));
   return result;
@@ -69,7 +69,8 @@ export function CoachView({
   coachSettings, setCoachSettings,
   coachConversations, setCoachConversations,
   pendingCoachContext, setPendingCoachContext,
-  pendingTools, setPendingTools
+  pendingTools, setPendingTools,
+  pendingWeekProposal, setPendingWeekProposal
 }) {
   const { showConfirm } = useDialog();
   const [inputText, setInputText] = useState('');
@@ -101,7 +102,7 @@ export function CoachView({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText, pendingTools]);
+  }, [messages, streamingText, pendingTools, pendingWeekProposal]);
 
   useEffect(() => {
     if (pendingCoachContext) {
@@ -130,9 +131,9 @@ export function CoachView({
         else if (keys.googleKey) activeProvider = 'google';
         else if (keys.openrouterKey) activeProvider = 'openrouter';
       }
-      const activeKey = activeProvider === 'anthropic' ? keys.anthropicKey : 
-                        activeProvider === 'google' ? keys.googleKey : 
-                        keys.openrouterKey;
+      const activeKey = activeProvider === 'anthropic' ? keys.anthropicKey :
+        activeProvider === 'google' ? keys.googleKey :
+          keys.openrouterKey;
 
       setCoachSettings({
         ...coachSettings,
@@ -151,7 +152,7 @@ export function CoachView({
           <h2>AI Coach Settings</h2>
           <p style={{ marginBottom: '1.5rem' }}>Store multiple keys and switch anytime.</p>
           <div className="setup-fields">
-             <div className="setup-field">
+            <div className="setup-field">
               <label>Anthropic API Key</label>
               <input type="password" value={apiKeyInput.anthropic} onChange={e => setApiKeyInput({ ...apiKeyInput, anthropic: e.target.value })} />
             </div>
@@ -218,8 +219,9 @@ export function CoachView({
     updateConversation(updatedMessages);
     setIsLoading(true);
     try {
-      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory });
       const apiMessages = updatedMessages.filter(m => m.role === 'user' || m.role === 'assistant');
+      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessages });
+
       let accText = '';
       const result = await sendCoachMessage({
         apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt, messages: apiMessages,
@@ -227,10 +229,27 @@ export function CoachView({
       });
 
       if (result.toolUses && result.toolUses.length > 0) {
-        const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map(tu => ({ ...tu, isPending: true })), isPending: true, convId: activeConvId };
-        const finalMsgs = [...updatedMessages, assistantMsg];
-        updateConversation(finalMsgs);
-        setPendingTools({ convId: activeConvId, tools: result.toolUses, snapshot: { schedule, goals, coachMemory }, result, originalMsgs: finalMsgs });
+        const createNextWeekTool = result.toolUses.find(tu => tu.name === 'create_next_week');
+
+        if (createNextWeekTool) {
+          // Found a Sunday Proposal
+          setPendingWeekProposal({
+            weekId: createNextWeekTool.input.weekId || '',
+            schedule: createNextWeekTool.input.schedule,
+            summary: createNextWeekTool.input.summary || 'Proposta pronta per essere revisionata.',
+            createdAt: new Date().toISOString(),
+            toolCalls: result.toolUses
+          });
+          const assistantMsg = { role: 'assistant', content: result.text || 'Ho preparato una proposta per la prossima settimana.', convId: activeConvId };
+          const finalMsgs = [...updatedMessages, assistantMsg];
+          updateConversation(finalMsgs);
+        } else {
+          // General pending tools
+          const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map(tu => ({ ...tu, isPending: true })), isPending: true, convId: activeConvId };
+          const finalMsgs = [...updatedMessages, assistantMsg];
+          updateConversation(finalMsgs);
+          setPendingTools({ convId: activeConvId, tools: result.toolUses, snapshot: { schedule, goals, coachMemory }, result, originalMsgs: finalMsgs });
+        }
       } else {
         updateConversation([...updatedMessages, { role: 'assistant', content: result.text }]);
       }
@@ -242,6 +261,26 @@ export function CoachView({
     }
   };
 
+  const handleApproveProposal = () => {
+    setIsLoading(true);
+    try {
+      const appState = {
+        schedule, setSchedule,
+        goals, setGoals,
+        coachMemory, setCoachMemory,
+        weeks, setWeeks, currentWeekId, setCurrentWeekId, profile, setProfile
+      };
+      pendingWeekProposal.toolCalls.forEach(tc => {
+        executeToolCall(tc.name, tc.input, appState);
+      });
+      setPendingWeekProposal(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleApprove = async () => {
     const { result, originalMsgs, snapshot } = pendingTools;
     const activeTools = result.toolUses.map((tu, idx) => {
@@ -249,12 +288,12 @@ export function CoachView({
       if (overrides[idx]) return { ...tu, input: overrides[idx] };
       return tu;
     }).filter(Boolean);
-    
+
     setPendingTools(null);
     setDisabledToolIndices(new Set());
     setOverrides({});
     setIsLoading(true);
-    
+
     if (activeTools.length === 0) {
       handleReject();
       return;
@@ -289,7 +328,7 @@ export function CoachView({
     updateConversation(updatedWithResult);
 
     try {
-      const systemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory });
+      const systemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory, weeks, messages: updatedWithResult });
       let accText = '';
       const followUp = await sendToolResults({
         apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt,
@@ -323,43 +362,43 @@ export function CoachView({
 
   const renderVisualPreview = (pt) => {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    
+
     // Find first day with changes if not set
-    const daysWithChanges = days.filter(d => 
-      pt.tools.some(tu => tu.input.day === d || tu.input.fromDay === d || ['rewrite_week', 'create_next_week'].includes(tu.name))
+    const daysWithChanges = days.filter(d =>
+      pt.tools.some(tu => tu.input.day === d || tu.input.fromDay === d || ['rewrite_week', 'create_next_week', 'modify_session'].includes(tu.name))
     );
-    
+
     const currentDay = previewDay || daysWithChanges[0] || 'monday';
     const originalExs = pt.snapshot.schedule[currentDay] || [];
-    
+
     // Calculate what happens on this day - processed regardless of disabled status to keep cards visible
     const dayTools = pt.tools.map((tu, idx) => ({ ...tu, idx })).filter(tu => {
-      return tu.input.day === currentDay || tu.input.fromDay === currentDay || ['rewrite_week', 'create_next_week'].includes(tu.name);
+      return tu.input.day === currentDay || tu.input.fromDay === currentDay || ['rewrite_week', 'create_next_week', 'modify_session'].includes(tu.name);
     });
 
     // Simple "simulation" for the visual preview
     let previewExs = [...originalExs.map(ex => ({ ...ex, status: 'original' }))];
-    
+
     dayTools.forEach(tu => {
       const input = overrides[tu.idx] || tu.input;
 
       if (tu.name === 'add_exercise') {
         previewExs.push({ ...input.exercise, id: `preview-${tu.idx}`, status: 'added', toolIdx: tu.idx });
-      } else if (tu.name === 'remove_exercise') {
-        const found = previewExs.find(e => e.id === input.exerciseId);
+      } else if (tu.name === 'remove_exercise' || (tu.name === 'modify_session' && input.action === 'remove')) {
+        const targetId = input.exerciseId || input.sessionId;
+        const found = previewExs.find(e => e.id === targetId);
         if (found) { found.status = 'removed'; found.toolIdx = tu.idx; }
-      } else if (tu.name === 'modify_exercise') {
-        const found = previewExs.find(e => e.id === input.exerciseId);
+      } else if (tu.name === 'modify_session') {
+        const found = previewExs.find(e => e.id === input.sessionId);
         if (found) {
-          Object.assign(found, input.fields);
-          found.status = 'modified';
-          found.toolIdx = tu.idx;
-        }
-      } else if (tu.name === 'replace_exercise') {
-        const found = previewExs.find(e => e.id === input.exerciseId);
-        if (found) {
-          found.status = 'removed'; found.toolIdx = tu.idx;
-          previewExs.push({ ...input.newExercise, id: `preview-r-${tu.idx}`, status: 'added', toolIdx: tu.idx });
+          if (input.action === 'update') {
+            Object.assign(found, input.updates);
+            found.status = 'modified';
+            found.toolIdx = tu.idx;
+          } else if (input.action === 'replace') {
+            found.status = 'removed'; found.toolIdx = tu.idx;
+            previewExs.push({ ...input.replacement, id: `preview-r-${tu.idx}`, status: 'added', toolIdx: tu.idx });
+          }
         }
       } else if (tu.name === 'rewrite_week' || tu.name === 'create_next_week') {
         const newDayExs = input.schedule[currentDay] || [];
@@ -374,10 +413,10 @@ export function CoachView({
 
       if (tu.name === 'add_exercise') {
         newOverrides[idx] = { ...tu.input, exercise: newEx };
-      } else if (tu.name === 'modify_exercise') {
-        newOverrides[idx] = { ...tu.input, fields: newEx };
-      } else if (tu.name === 'replace_exercise') {
-        newOverrides[idx] = { ...tu.input, newExercise: newEx };
+      } else if (tu.name === 'modify_session' && tu.input.action === 'update') {
+        newOverrides[idx] = { ...tu.input, updates: newEx };
+      } else if (tu.name === 'modify_session' && tu.input.action === 'replace') {
+        newOverrides[idx] = { ...tu.input, replacement: newEx };
       } else if (tu.name === 'rewrite_week' || tu.name === 'create_next_week') {
         const newSchedule = JSON.parse(JSON.stringify(overrides[idx]?.schedule || tu.input.schedule));
         newSchedule[currentDay][exIdx] = { ...newSchedule[currentDay][exIdx], ...newEx };
@@ -391,15 +430,15 @@ export function CoachView({
       <div className="coach-visual-preview">
         {editingToolRef && (
           <div className="preview-edit-overlay">
-            <ExerciseEditor 
+            <ExerciseEditor
               exercise={(() => {
                 const { idx, exIdx } = editingToolRef;
                 const tu = pt.tools[idx];
                 const input = overrides[idx] || tu.input;
                 if (tu.name === 'rewrite_week' || tu.name === 'create_next_week') return input.schedule[currentDay][exIdx];
                 if (tu.name === 'add_exercise') return input.exercise;
-                if (tu.name === 'modify_exercise') return { ...pt.snapshot.schedule[currentDay].find(e => e.id === input.exerciseId), ...input.fields };
-                if (tu.name === 'replace_exercise') return input.newExercise;
+                if (tu.name === 'modify_session' && input.action === 'update') return { ...pt.snapshot.schedule[currentDay].find(e => e.id === input.sessionId), ...input.updates };
+                if (tu.name === 'modify_session' && input.action === 'replace') return input.replacement;
                 return {};
               })()}
               onSave={handleSaveEdit}
@@ -418,13 +457,13 @@ export function CoachView({
           {previewExs.length === 0 && <div className="preview-empty">Nessun esercizio pianificato.</div>}
           {previewExs.map((ex, i) => (
             <div key={i} className={`preview-ex-card status-${ex.status} ${ex.toolIdx !== undefined && disabledToolIndices.has(ex.toolIdx) ? 'is-disabled' : ''}`}
-                 onClick={() => ex.toolIdx !== undefined && toggleTool(ex.toolIdx)}>
+              onClick={() => ex.toolIdx !== undefined && toggleTool(ex.toolIdx)}>
               <div className="preview-ex-header">
                 <span className="preview-ex-type">{ex.type}</span>
                 <span className="preview-ex-name">{ex.name}</span>
                 {ex.toolIdx !== undefined && ex.status !== 'removed' && (
                   <button className="preview-edit-btn" onClick={(e) => { e.stopPropagation(); setEditingToolRef({ idx: ex.toolIdx, exIdx: ex.exIdx }); }}>
-                     <Settings size={14} />
+                    <Settings size={14} />
                   </button>
                 )}
               </div>
@@ -439,16 +478,15 @@ export function CoachView({
   };
 
   const formatToolName = name => {
-    const map = { 
-      'modify_exercise': 'Modifica', 
-      'add_exercise': 'Aggiungi', 
-      'remove_exercise': 'Rimuovi', 
-      'replace_exercise': 'Sostituisci', 
-      'rewrite_week': 'Reset Settimana', 
-      'create_next_week': 'Nuova Settimana',
+    const map = {
+      'modify_session': 'Modifica Sessione',
+      'add_exercise': 'Aggiungi',
+      'remove_exercise': 'Rimuovi',
       'reschedule_exercise': 'Sposta',
-      'update_coach_memory': 'Memoria', 
-      'update_goal': 'Obiettivo',
+      'rewrite_week': 'Reset Settimana',
+      'create_next_week': 'Nuova Settimana',
+      'update_coach_memory': 'Memoria',
+      'update_goals': 'Obiettivo',
       'update_skill_level': 'Skill Level'
     };
     return map[name] || name;
@@ -478,17 +516,17 @@ export function CoachView({
         )}
 
         <div className="coach-header-row coach-model-group">
-          <select 
-            className="coach-provider-select" 
-            value={coachSettings.activeProvider} 
+          <select
+            className="coach-provider-select"
+            value={coachSettings.activeProvider}
             onChange={e => {
               const p = e.target.value;
               const k = p === 'anthropic' ? (coachSettings.anthropicKey || '') : p === 'google' ? (coachSettings.googleKey || '') : (coachSettings.openrouterKey || '');
-              setCoachSettings({ 
-                ...coachSettings, 
-                activeProvider: p, 
-                apiKey: k, 
-                model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022' 
+              setCoachSettings({
+                ...coachSettings,
+                activeProvider: p,
+                apiKey: k,
+                model: p === 'google' ? 'gemini-2.5-flash' : p === 'openrouter' ? 'deepseek/deepseek-chat' : 'claude-3-5-sonnet-20241022'
               });
             }}
           >
@@ -497,9 +535,9 @@ export function CoachView({
             <option value="openrouter">OpenRouter</option>
           </select>
 
-          <select 
-            className="coach-model-select" 
-            value={coachSettings.model} 
+          <select
+            className="coach-model-select"
+            value={coachSettings.model}
             onChange={e => {
               if (e.target.value === 'CUSTOM') {
                 const custom = prompt('Inserisci ID Modello OpenRouter (es. openai/gpt-4o):');
@@ -537,52 +575,89 @@ export function CoachView({
         </div>
       </div>
 
-
       <div className="coach-messages">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`coach-msg ${msg.role}`}>
-             {msg.role === 'assistant' && msg.toolCalls?.map((tc, ti) => (
-               <div key={ti} className="coach-tool-indicator">
-                 {tc.isPending ? '⏳' : '✅'} {formatToolName(tc.name)}
-               </div>
-             ))}
-             {renderMarkdown(msg.content)}
-             {msg.role === 'assistant' && msg.snapshot && !msg.undone && (
-               <button className="undo-btn" onClick={() => { setSchedule(msg.snapshot.schedule); setGoals(msg.snapshot.goals); setCoachMemory(msg.snapshot.coachMemory); updateConversation(messages.map((m, i) => i === idx ? { ...m, undone: true } : m)); }}>↩ Undo</button>
-             )}
-          </div>
-        ))}
-        {streamingText && <div className="coach-msg assistant">{renderMarkdown(streamingText)}</div>}
-        {isLoading && !streamingText && <div className="coach-typing"><span className="dot"/><span className="dot"/><span className="dot"/></div>}
-        {error && (
-          <div className="coach-msg system error">
-            <div className="error-icon">⚠️</div>
-            <div className="error-content">
-              <strong>Si è verificato un errore:</strong>
-              <p>{error}</p>
-              <button className="btn-text" style={{ fontSize: '0.8rem', padding: '0', marginTop: '4px' }} onClick={() => handleSend()}>Riprova</button>
+        {pendingWeekProposal && (
+          <div className="pending-proposal-banner">
+            <div className="proposal-banner-header">
+              <span>📋 Proposta settimana {pendingWeekProposal.weekId}</span>
+              <span className="proposal-date">
+                {new Date(pendingWeekProposal.createdAt).toLocaleDateString('it-IT')}
+              </span>
+            </div>
+            <p className="proposal-summary">{pendingWeekProposal.summary}</p>
+            <div className="proposal-actions">
+              <button className="btn-primary" onClick={handleApproveProposal}>
+                ✅ Applica
+              </button>
+              <button className="btn-secondary" onClick={() => setPendingWeekProposal(null)}>
+                ❌ Rifiuta
+              </button>
+              <button className="btn-text" onClick={() => {
+                const mockResult = {
+                  toolUses: pendingWeekProposal.toolCalls,
+                  text: pendingWeekProposal.summary
+                };
+                setPendingTools({
+                  convId: activeConvId,
+                  tools: pendingWeekProposal.toolCalls,
+                  snapshot: { schedule, goals, coachMemory },
+                  result: mockResult,
+                  originalMsgs: messages
+                });
+                setPendingWeekProposal(null);
+              }}>
+                👁 Visualizza Dettaglio / Modifica
+              </button>
             </div>
           </div>
         )}
 
-        {pendingTools && pendingTools.convId === activeConvId && (
-          <div className="coach-approval-card detailed">
-            <h4>Proposta di Allenamento</h4>
-            <p>Verifica le modifiche giorno per giorno prima di confermare:</p>
-            
-            {renderVisualPreview(pendingTools)}
-
-            <div className="approval-actions">
-              <button className="btn-primary" onClick={handleApprove}>Applica Modifiche</button>
-              <button className="btn-secondary" onClick={handleReject}>Annulla</button>
+        <div className="coach-messages-content">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`coach-msg ${msg.role}`}>
+              {msg.role === 'assistant' && msg.toolCalls?.map((tc, ti) => (
+                <div key={ti} className="coach-tool-indicator">
+                  {tc.isPending ? '⏳' : '✅'} {formatToolName(tc.name)}
+                </div>
+              ))}
+              {renderMarkdown(msg.content)}
+              {msg.role === 'assistant' && msg.snapshot && !msg.undone && (
+                <button className="undo-btn" onClick={() => { setSchedule(msg.snapshot.schedule); setGoals(msg.snapshot.goals); setCoachMemory(msg.snapshot.coachMemory); updateConversation(messages.map((m, i) => i === idx ? { ...m, undone: true } : m)); }}>↩ Undo</button>
+              )}
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} style={{ height: '1px' }} />
+          ))}
+          {streamingText && <div className="coach-msg assistant">{renderMarkdown(streamingText)}</div>}
+          {isLoading && !streamingText && <div className="coach-typing"><span className="dot" /><span className="dot" /><span className="dot" /></div>}
+          {error && (
+            <div className="coach-msg system error">
+              <div className="error-icon">⚠️</div>
+              <div className="error-content">
+                <strong>Si è verificato un errore:</strong>
+                <p>{error}</p>
+                <button className="btn-text" style={{ fontSize: '0.8rem', padding: '0', marginTop: '4px' }} onClick={() => handleSend()}>Riprova</button>
+              </div>
+            </div>
+          )}
+
+          {pendingTools && pendingTools.convId === activeConvId && (
+            <div className="coach-approval-card detailed">
+              <h4>Proposta di Allenamento</h4>
+              <p>Verifica le modifiche giorno per giorno prima di confermare:</p>
+
+              {renderVisualPreview(pendingTools)}
+
+              <div className="approval-actions">
+                <button className="btn-primary" onClick={handleApprove}>Applica Modifiche</button>
+                <button className="btn-secondary" onClick={handleReject}>Annulla</button>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} style={{ height: '1px' }} />
+        </div>
       </div>
 
       <div className="coach-schedule-preview">
-        <h4>Weekly Preview <button onClick={() => setShowSchedulePreview(!showSchedulePreview)}>{showSchedulePreview ? <EyeOff size={14}/> : <Eye size={14}/>}</button></h4>
+        <h4>Weekly Preview <button onClick={() => setShowSchedulePreview(!showSchedulePreview)}>{showSchedulePreview ? <EyeOff size={14} /> : <Eye size={14} />}</button></h4>
         {showSchedulePreview && daysOfWeek.map(day => (
           <div key={day} className="coach-schedule-day">
             <span className="coach-schedule-day-name">{day.slice(0, 3)}</span>
@@ -594,7 +669,7 @@ export function CoachView({
       </div>
 
       <div className="coach-input-area">
-        <textarea ref={textareaRef} value={inputText} onChange={e => setInputText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} placeholder="Scrivi al coach..." rows={1} disabled={isLoading} />
+        <textarea ref={textareaRef} value={inputText} onChange={e => setInputText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Scrivi al coach..." rows={1} disabled={isLoading} />
         <button className="coach-send-btn" onClick={handleSend} disabled={isLoading || !inputText.trim()}><Send size={18} /></button>
       </div>
       {showMemory && <><div className="modal-overlay" onClick={() => setShowMemory(false)} /><CoachMemoryPanel coachMemory={coachMemory} setCoachMemory={setCoachMemory} onClose={() => setShowMemory(false)} /></>}
