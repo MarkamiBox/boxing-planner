@@ -1,5 +1,6 @@
 /**
  * Coach API Service — Handles Claude (Anthropic direct) and OpenRouter communication with tool use
+ * Version 2: Complete rewrite with intent detection, modular knowledge base, and body map pattern detection
  */
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
