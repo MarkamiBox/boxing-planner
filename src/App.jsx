@@ -40,7 +40,7 @@ function AppContent() {
       activeWorkout={appState.activeWorkout}
       setActiveWorkout={appState.setActiveWorkout}
       setActiveTab={setActiveTab}
-      globalPrepTime={appState.profile?.prepTime !== undefined ? appState.profile.prepTime : 10}
+      globalPrepTime={appState.profile?.prepTime !== undefined ? appState.profile.prepTime : 60}
       profile={appState.profile}
       addSessionNote={addSessionNote}
     >

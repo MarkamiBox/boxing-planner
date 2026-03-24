@@ -14,7 +14,7 @@ const initialProfile = {
   experience: '6 months',
   style: 'all-around',
   primaryPunch: 'jab',
-  prepTime: 10,
+  prepTime: 60,
   voiceTriggerWord: 'nota',
   voiceNotesEnabled: true,
   levels: { cardio: 2, technique: 2, footwork: 2, defense: 2, jab: 2, reading: 2 }

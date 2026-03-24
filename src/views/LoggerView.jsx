@@ -69,6 +69,49 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     }
   }, [activeWorkout]);
 
+  // Draft Persistence Logic
+  const DRAFT_KEY = 'bxng_log_draft';
+  
+  useEffect(() => {
+    try {
+      const savedDraft = window.localStorage.getItem(DRAFT_KEY);
+      if (savedDraft && !activeWorkout) {
+        const d = JSON.parse(savedDraft);
+        if (d.date) setDate(d.date);
+        if (d.type) setType(d.type);
+        if (d.timeOfDay) setTimeOfDay(d.timeOfDay);
+        if (d.durationStr) setDurationStr(d.durationStr);
+        if (d.energy) setEnergy(d.energy);
+        if (d.cardio) setCardio(d.cardio);
+        if (d.legs) setLegs(d.legs);
+        if (d.intensity) setIntensity(d.intensity);
+        if (d.focus) setFocus(d.focus);
+        if (d.notes) setNotes(d.notes);
+        if (d.distance) setDistance(d.distance);
+        if (d.pace) setPace(d.pace);
+        if (d.time) setTime(d.time);
+        if (d.sparringRounds) setSparringRounds(d.sparringRounds);
+        if (d.lastRoundDrop) setLastRoundDrop(d.lastRoundDrop);
+        if (d.bodyWeight) setBodyWeight(d.bodyWeight);
+        if (d.sleepHours) setSleepHours(d.sleepHours);
+        if (d.sleepQuality) setSleepQuality(d.sleepQuality);
+        if (d.bodyMap) setBodyMap(d.bodyMap);
+      }
+    } catch (e) { console.error("Restore draft failed", e); }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const draft = {
+        date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus,
+        notes, distance, pace, time, sparringRounds, lastRoundDrop,
+        bodyWeight, sleepHours, sleepQuality, bodyMap
+      };
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus, notes, distance, pace, time, sparringRounds, lastRoundDrop, bodyWeight, sleepHours, sleepQuality, bodyMap]);
+
   const handleSave = (e) => {
     e.preventDefault();
     if (savedMessage) return;
@@ -128,6 +171,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     }
 
     if (activeWorkout && setActiveWorkout) setActiveWorkout(null);
+    window.localStorage.removeItem(DRAFT_KEY);
     setSavedMessage(true);
     setTimeout(() => {
       setSavedMessage(false);

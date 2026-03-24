@@ -9,10 +9,10 @@ export const playBeep = (type = 'short', noSound = false) => {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gainNode = ctx.createGain();
-    
+
     osc.connect(gainNode);
     gainNode.connect(ctx.destination);
-    
+
     if (type === 'long') {
       osc.frequency.value = 400;
       gainNode.gain.setValueAtTime(1, ctx.currentTime);
@@ -26,7 +26,7 @@ export const playBeep = (type = 'short', noSound = false) => {
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.3);
     }
-    
+
     if (navigator.vibrate) {
       if (type === 'long') navigator.vibrate([1000]);
       else navigator.vibrate([300]);
@@ -36,7 +36,7 @@ export const playBeep = (type = 'short', noSound = false) => {
   }
 };
 
-export function TimerProvider({ children, activeWorkout, setActiveWorkout, setActiveTab, globalPrepTime = 10, profile, addSessionNote }) {
+export function TimerProvider({ children, activeWorkout, setActiveWorkout, setActiveTab, globalPrepTime = 60, profile, addSessionNote }) {
   const { showConfirm } = useDialog();
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -44,7 +44,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   const [work, setWork] = useState(180);
   const [rest, setRest] = useState(60);
   const [totalRounds, setTotalRounds] = useState(3);
-  
+
   // Shared Timer Execution State
   const [isRunning, setIsRunning] = useState(false);
   const [phase, setPhase] = useState('stopped'); // stopped, prep, work, rest
@@ -84,15 +84,15 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         setCurrentStepIdx(parsed.currentStepIdx || 0);
         setTimeLeft(parsed.timeLeft);
         if (parsed.expectedEndTime) {
-           timerRef.current.expectedEndTime = parsed.expectedEndTime;
+          timerRef.current.expectedEndTime = parsed.expectedEndTime;
         }
         if (parsed.statsTracker) statsTracker.current = parsed.statsTracker;
         if (parsed.plannedDuration) plannedDuration.current = parsed.plannedDuration;
         if (parsed.isRunning && parsed.expectedEndTime) {
-           setIsRunning(true);
+          setIsRunning(true);
         }
       }
-    } catch(e) {}
+    } catch (e) { }
   }, []);
 
   // Save state continuously
@@ -132,38 +132,40 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
 
       timerRef.current.interval = setInterval(() => {
         const now = Date.now();
-        
+
         if (statsTracker.current.lastActive) {
           statsTracker.current.actualDuration += (now - statsTracker.current.lastActive) / 1000;
         }
         statsTracker.current.lastActive = now;
 
         const absoluteTimeLeft = Math.ceil((timerRef.current.expectedEndTime - now) / 1000);
-        
+
         if (absoluteTimeLeft <= 0) {
-           handlePhaseTransition();
-           delete timerRef.current.expectedEndTime;
+          handlePhaseTransition();
+          delete timerRef.current.expectedEndTime;
         } else {
-           setTimeLeft(absoluteTimeLeft);
-           if (absoluteTimeLeft <= 3 && absoluteTimeLeft > 0 && soundEnabled && !timerRef.current['beeped' + absoluteTimeLeft]) {
-              playBeep('short', !soundEnabled);
-              timerRef.current['beeped' + absoluteTimeLeft] = true;
-           }
+          setTimeLeft(absoluteTimeLeft);
+          if (absoluteTimeLeft <= 3 && absoluteTimeLeft > 0 && soundEnabled && !timerRef.current['beeped' + absoluteTimeLeft]) {
+            playBeep('short', !soundEnabled);
+            timerRef.current['beeped' + absoluteTimeLeft] = true;
+          }
         }
       }, 250);
     } else {
       statsTracker.current.lastActive = null;
       if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
-      delete timerRef.current.expectedEndTime; 
+      delete timerRef.current.expectedEndTime;
     }
-    
+
     return () => {
-       if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
-       delete timerRef.current.beeped1;
-       delete timerRef.current.beeped2;
-       delete timerRef.current.beeped3;
+      if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
+      delete timerRef.current.beeped1;
+      delete timerRef.current.beeped2;
+      delete timerRef.current.beeped3;
     };
   }, [isRunning, phase, currentRound, isGuided, currentStepIdx, timeLeft, soundEnabled]);
+
+
 
   const handlePhaseTransition = () => {
     playBeep('long', !soundEnabled);
@@ -228,7 +230,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         if (currentRound >= currentStep.sets) {
           advanceGuidedStep();
         } else {
-          setCurrentRound(prev => prev + 1); 
+          setCurrentRound(prev => prev + 1);
         }
       }
     }
@@ -239,7 +241,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       // Workout Complete!
       setPhase('stopped');
       setIsRunning(false);
-      
+
       if (isGuided) {
         setActiveWorkout({
           ...activeWorkout,
@@ -255,15 +257,15 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       const nextStep = activeWorkout.steps[currentStepIdx + 1];
       setCurrentStepIdx(prev => prev + 1);
       prepareGuidedStep(nextStep);
-      
+
       if (nextStep.type !== 'manual_timer' && nextStep.type !== 'sets' && nextStep.type !== 'text') {
         const stepPrep = getStepPrepTime(nextStep);
         setTimeout(() => {
           setPhase('prep');
           setTimeLeft(stepPrep > 0 ? stepPrep : 0);
           if (stepPrep === 0 && nextStep.type === 'timer') {
-             setPhase('work');
-             setTimeLeft(nextStep.duration);
+            setPhase('work');
+            setTimeLeft(nextStep.duration);
           }
           setIsRunning(true);
         }, 50);
@@ -295,19 +297,19 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     if (isGuided && currentStep) {
       if (currentStep.type !== 'sets') {
         if (phase === 'stopped') {
-           const stepPrep = getStepPrepTime(currentStep);
-           setPhase('prep');
-           setTimeLeft(stepPrep);
-           setIsRunning(true);
-           playBeep('short', !soundEnabled);
-           // if no prep time, jump straight in
-           if (stepPrep === 0 && currentStep.type === 'timer') {
-             setPhase('work');
-             setTimeLeft(currentStep.duration);
-           }
+          const stepPrep = getStepPrepTime(currentStep);
+          setPhase('prep');
+          setTimeLeft(stepPrep);
+          setIsRunning(true);
+          playBeep('short', !soundEnabled);
+          // if no prep time, jump straight in
+          if (stepPrep === 0 && currentStep.type === 'timer') {
+            setPhase('work');
+            setTimeLeft(currentStep.duration);
+          }
         } else {
-           setIsRunning(true);
-           playBeep('short', !soundEnabled);
+          setIsRunning(true);
+          playBeep('short', !soundEnabled);
         }
       }
     } else {
@@ -338,7 +340,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     setPhase('stopped');
     setTimeLeft(0);
     setCurrentRound(1);
-    setCurrentStepIdx(0); 
+    setCurrentStepIdx(0);
     if (isGuided && showConfirm) {
       const partialStats = {
         ...activeWorkout,
@@ -351,7 +353,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       showConfirm(
         'Interrompi Workout',
         `Vuoi loggare l'attività parziale o annullare?`,
-        () => { setActiveWorkout(partialStats); if(setActiveTab) setActiveTab('logger'); },
+        () => { setActiveWorkout(partialStats); if (setActiveTab) setActiveTab('logger'); },
         () => { setActiveWorkout(null); }
       );
     }
@@ -360,7 +362,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   const skipStep = () => {
     statsTracker.current.skippedSteps += 1;
     delete timerRef.current.expectedEndTime;
-    if (!isGuided) { 
+    if (!isGuided) {
       if (phase === 'work' && currentRound < totalRounds) {
         setPhase('rest');
         setTimeLeft(rest);
@@ -412,9 +414,9 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         // Go back to Prep phase if this is the start of the interval 
         const stepPrep = getStepPrepTime(currentStep);
         if (phase !== 'prep' && stepPrep > 0) {
-           setPhase('prep');
-           setTimeLeft(stepPrep);
-           return;
+          setPhase('prep');
+          setTimeLeft(stepPrep);
+          return;
         }
       }
     } else if (currentStep.type === 'timer' || currentStep.type === 'manual_timer') {
@@ -438,7 +440,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     statsTracker.current.skippedSteps = Math.max(0, statsTracker.current.skippedSteps - 1);
     const prevStepIdx = currentStepIdx - 1;
     const prevStep = activeWorkout.steps[prevStepIdx];
-    
+
     setCurrentStepIdx(prevStepIdx);
     delete timerRef.current.expectedEndTime;
     setIsRunning(false);
@@ -460,9 +462,9 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   };
 
   const getPhaseColor = () => {
-    if (phase === 'work') return '#ef4444'; 
-    if (phase === 'rest') return '#3b82f6'; 
-    if (phase === 'prep') return '#f59e0b'; 
+    if (phase === 'work') return '#ef4444';
+    if (phase === 'rest') return '#3b82f6';
+    if (phase === 'prep') return '#f59e0b';
     return '#9ca3af';
   };
 
@@ -482,10 +484,11 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       isRunning, phase, timeLeft, currentRound, currentStepIdx,
       isGuided, currentStep, activeWorkout,
       getPhaseColor, getPhaseLabel, getNoteTag,
-      
+
+
       // Actions
       startTimer, pauseTimer, stopTimer, skipStep, previousStep, completeSet, advanceGuidedStep,
-      
+
       // Global Settings
       globalPrepTime
     }}>
