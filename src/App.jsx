@@ -47,16 +47,41 @@ function AppContent() {
       <div className="app-container">
         {storageError && (
           <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
             backgroundColor: '#ff4444',
             color: 'white',
-            padding: '10px',
+            padding: '10px 20px',
             textAlign: 'center',
             fontSize: '0.9rem',
-            fontWeight: 'bold',
-            zIndex: 1000,
-            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+            fontWeight: '600',
+            zIndex: 9999,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px'
           }}>
-            ⚠️ Errore di salvataggio: la memoria locale è piena o bloccata. I dati potrebbero non essere salvati.
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <span>Local storage is full or blocked. Your session data won't save. {typeof storageError === 'string' ? `(${storageError})` : ''}</span>
+            <button 
+              onClick={() => appState.setStorageError(null)}
+              style={{
+                background: 'white',
+                color: '#ff4444',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 12px',
+                marginLeft: '10px',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '0.8rem'
+              }}
+            >
+              OK
+            </button>
           </div>
         )}
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />

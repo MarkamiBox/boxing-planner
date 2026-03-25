@@ -283,9 +283,12 @@ export function AvailabilityCalendar({
   profile = {},
   onConflictDetected,
 }) {
-  const [activeForm, setActiveForm] = useState(null); // { day, slotIndex, anchor, existingSlot }
+  const [activeForm, setActiveForm] = useState(null); // { day, rowIndex, anchor, existingSlot, initialData }
   const [dragging, setDragging] = useState(null); // { day, slot, span }
   const [dragOver, setDragOver] = useState(null); // { day, rowIndex }
+  const [creatingDrag, setCreatingDrag] = useState(null); // { day, startRowIndex, endRowIndex }
+
+  const gridRef = useRef(null);
 
   // Build time rows
   const timeRows = Array.from({ length: TOTAL_SLOTS }, (_, i) => slotIndexToLabel(i));
@@ -451,9 +454,64 @@ export function AvailabilityCalendar({
           return next;
         });
       }
+    } else if (creatingDrag) {
+      const { day, startRowIndex, endRowIndex } = creatingDrag;
+      const start = Math.min(startRowIndex, endRowIndex);
+      const end = Math.max(startRowIndex, endRowIndex) + 1;
+
+      // Find start cell for anchor
+      const cellEl = gridRef.current?.querySelector(`.av-cell[data-day="${day}"][data-row-index="${start}"]`);
+      const rect = cellEl?.getBoundingClientRect();
+
+      const initialData = {
+        start: slotIndexToLabel(start),
+        end: slotIndexToLabel(Math.min(end, TOTAL_SLOTS)),
+        reason: 'work',
+        customReason: '',
+        importance: 'hard',
+        energyAfter: 'neutral',
+        isRecurring: false,
+      };
+
+      setActiveForm({ day, rowIndex: start, anchor: rect, existingSlot: null, initialData });
     }
     setDragging(null);
     setDragOver(null);
+    setCreatingDrag(null);
+  };
+
+  const getCellFromTouch = (touch) => {
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = el?.closest('.av-cell');
+    if (!cell) return null;
+    const day = cell.getAttribute('data-day');
+    const rowIndex = parseInt(cell.getAttribute('data-row-index'));
+    return { day, rowIndex };
+  };
+
+  const handleTouchStart = (e, day, rowIndex, slot = null) => {
+    if (slot) {
+      const startIdx = slotIndexFromTime(slot.start);
+      const endIdx = slotIndexFromTime(slot.end);
+      setDragging({ day, slot, span: endIdx - startIdx });
+    } else {
+      setCreatingDrag({ day, startRowIndex: rowIndex, endRowIndex: rowIndex });
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!dragging && !creatingDrag) return;
+    if (e.cancelable) e.preventDefault();
+
+    const touch = e.touches[0];
+    const cell = getCellFromTouch(touch);
+    if (!cell) return;
+
+    if (dragging) {
+      handleDragOver(cell.day, cell.rowIndex);
+    } else if (creatingDrag && cell.day === creatingDrag.day) {
+      setCreatingDrag(prev => ({ ...prev, endRowIndex: cell.rowIndex }));
+    }
   };
 
   const handleDelete = () => {
@@ -523,14 +581,29 @@ export function AvailabilityCalendar({
       return (
         <div
           key={`${day}-${rowIndex}`}
-          className={`av-cell${isHourStart ? ' hour-start' : ''}${conflict ? ' conflict' : ''}${dragOver && dragOver.day === day && dragOver.rowIndex === rowIndex ? ' drag-over' : ''}`}
+          data-day={day}
+          data-row-index={rowIndex}
+          className={`av-cell${isHourStart ? ' hour-start' : ''}${conflict ? ' conflict' : ''}${dragOver && dragOver.day === day && dragOver.rowIndex === rowIndex ? ' drag-over' : ''}${creatingDrag && creatingDrag.day === day && rowIndex >= Math.min(creatingDrag.startRowIndex, creatingDrag.endRowIndex) && rowIndex <= Math.max(creatingDrag.startRowIndex, creatingDrag.endRowIndex) ? ' drag-creating' : ''}`}
           style={{
             gridColumn: dayIdx + 2,
             gridRow: rowIndex + 2,
-            position: 'relative'
+            position: 'relative',
+            touchAction: 'none'
           }}
-          onClick={(e) => handleCellClick(day, rowIndex, e)}
-          onMouseEnter={() => handleDragOver(day, rowIndex)}
+          onClick={(e) => {
+            if (!creatingDrag && !dragging) handleCellClick(day, rowIndex, e);
+          }}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            setCreatingDrag({ day, startRowIndex: rowIndex, endRowIndex: rowIndex });
+          }}
+          onMouseEnter={() => {
+            if (creatingDrag && creatingDrag.day === day) {
+              setCreatingDrag(prev => ({ ...prev, endRowIndex: rowIndex }));
+            }
+            handleDragOver(day, rowIndex);
+          }}
+          onTouchStart={(e) => handleTouchStart(e, day, rowIndex)}
         >
           {/* Render All Items (Busy + Planned) starting in this cell */}
           {allItems.filter(it => Math.floor(slotIndexFromTime(it.start)) === rowIndex).map((it) => {
@@ -601,6 +674,10 @@ export function AvailabilityCalendar({
                       ...customStyle
                     }}
                     onMouseDown={(e) => handleDragStart(e, day, it)}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      handleTouchStart(e, day, rowIndex, it);
+                    }}
                   >
                     {fullName}
                   </div>
@@ -614,9 +691,16 @@ export function AvailabilityCalendar({
 
   return (
     <div>
-      <div className="av-cal-wrapper" onMouseUp={finalizeMove} onMouseLeave={() => { setDragging(null); setDragOver(null); }}>
+      <div 
+        className="av-cal-wrapper" 
+        onMouseUp={finalizeMove} 
+        onMouseLeave={() => { setDragging(null); setDragOver(null); setCreatingDrag(null); }}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={finalizeMove}
+      >
         <div
           className="av-cal-grid"
+          ref={gridRef}
           style={{ gridTemplateRows: `24px repeat(${TOTAL_SLOTS}, 24px)` }}
         >
           {/* Header */}
@@ -658,7 +742,7 @@ export function AvailabilityCalendar({
       {activeForm && (
         <SlotForm
           anchorRef={activeForm.anchor}
-          slotData={activeForm.existingSlot ? { ...activeForm.existingSlot } : {
+          slotData={activeForm.existingSlot ? { ...activeForm.existingSlot } : (activeForm.initialData || {
             start: slotIndexToLabel(activeForm.rowIndex),
             end: slotIndexToLabel(Math.min(activeForm.rowIndex + 2, TOTAL_SLOTS - 1)),
             reason: 'work',
@@ -666,7 +750,7 @@ export function AvailabilityCalendar({
             importance: 'hard',
             energyAfter: 'neutral',
             isRecurring: false,
-          }}
+          })}
           onSave={handleSave}
           onDelete={handleDelete}
           onCancel={() => setActiveForm(null)}

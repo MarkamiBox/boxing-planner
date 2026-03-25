@@ -140,6 +140,14 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
   };
 
   const handleAttachLocationSchedule = (idx) => {
+    const processScheduleData = (data) => {
+      if (!Array.isArray(data)) return data;
+      return data.map(item => ({
+        ...item,
+        courseId: item.courseId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9))
+      }));
+    };
+
     showChoice("Update Courses", "How would you like to provide the courses schedule for this location?", [
       {
         label: "Upload JSON File",
@@ -153,7 +161,8 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
             const reader = new FileReader();
             reader.onload = (event) => {
               try {
-                const scheduleData = JSON.parse(event.target.result);
+                let scheduleData = JSON.parse(event.target.result);
+                scheduleData = processScheduleData(scheduleData);
                 handleLocationChange(idx, 'schedule', scheduleData);
                 showAlert("Success", "Courses schedule uploaded for location! Don't forget to push Save Profile Changes.");
               } catch (err) {
@@ -173,7 +182,8 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           showPrompt("Paste Schedule", "Paste your courses JSON array here:", initial, (text) => {
             if (!text) return;
             try {
-              const scheduleData = JSON.parse(text);
+              let scheduleData = JSON.parse(text);
+              scheduleData = processScheduleData(scheduleData);
               handleLocationChange(idx, 'schedule', scheduleData);
               showAlert("Success", "Courses schedule updated! Don't forget to push Save Profile Changes.");
             } catch (err) {

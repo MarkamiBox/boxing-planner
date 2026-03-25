@@ -20,7 +20,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
 
-  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseIdx: '' });
+  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseId: '', courseIdx: '' });
   const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
   const [deletedItem, setDeletedItem] = useState(null); // { day, exercise, index }
   const undoTimerRef = useRef(null);
@@ -30,6 +30,22 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   // Swipe gesture tracking
   const swipeStartX = useRef(null);
+
+  const requestDayChange = (newDay) => {
+    if (newDay === activeDay) return;
+    if (editingId !== null) {
+      showConfirm(
+        'Unsaved Changes',
+        'You have unsaved changes. Discard them?',
+        () => {
+          setEditingId(null);
+          setActiveDay(newDay);
+        }
+      );
+    } else {
+      setActiveDay(newDay);
+    }
+  };
 
   const parseWeek = (wId) => {
     if (!wId) return { y: new Date().getFullYear(), w: 1 };
@@ -118,6 +134,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) })) : [],
       isCourse: exercise.isCourse || false,
       courseLocationId: exercise.courseLocationId || '',
+      courseId: exercise.courseId || '',
       courseIdx: exercise.courseIdx || ''
     });
   };
@@ -237,48 +254,75 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       return;
     }
 
+    const sanitizeExercise = (ex, fallbackId) => {
+      const s = {
+        id: ex.id || fallbackId,
+        type: ['Boxing', 'Strength', 'Running', 'Recovery'].includes(ex.type) ? ex.type : 'Boxing',
+        name: ex.name || 'Imported Exercise',
+        done: !!ex.done,
+        notes: ex.notes || '',
+        plannedTime: ex.plannedTime || '',
+        isCourse: !!ex.isCourse,
+        courseLocationId: ex.courseLocationId || '',
+        courseId: ex.courseId || '',
+        courseIdx: ex.courseIdx !== undefined ? ex.courseIdx : '',
+        steps: Array.isArray(ex.steps) ? ex.steps : []
+      };
+
+      s.steps = s.steps.map((step, idx) => {
+        const ss = {
+          id: step.id || Math.random().toString(36).substr(2, 9),
+          type: ['timer', 'manual_timer', 'interval', 'sets', 'text'].includes(step.type) ? step.type : 'timer',
+          name: step.name || `Step ${idx + 1}`,
+          instruction: step.instruction || ''
+        };
+        
+        // Ensure numeric fields are valid
+        if (ss.type === 'timer' || ss.type === 'manual_timer') {
+          ss.duration = parseInt(step.duration) || 180;
+        } else if (ss.type === 'interval') {
+          ss.work = parseInt(step.work) || 180;
+          ss.rest = parseInt(step.rest) || 60;
+          ss.rounds = parseInt(step.rounds) || 3;
+        } else if (ss.type === 'sets') {
+          ss.sets = parseInt(step.sets) || 3;
+          ss.reps = step.reps || '10';
+          ss.rest = parseInt(step.rest) || 60;
+        }
+        
+        if (step.prepTime !== undefined) {
+          ss.prepTime = parseInt(step.prepTime);
+        }
+        
+        return ss;
+      });
+      return s;
+    };
+
     if (jsonImport.mode === 'week') {
-      // Validate week structure
       if (typeof parsed !== 'object' || Array.isArray(parsed)) {
         setJsonImport(s => ({ ...s, error: 'Per l\'import settimanale serve un oggetto con i giorni (monday, tuesday...).' }));
         return;
       }
-      const newWeeks = { ...weeks, [currentWeekId]: parsed };
+      
+      const sanitizedWeek = {};
+      daysOfWeek.forEach(day => {
+        const dayExercises = Array.isArray(parsed[day]) ? parsed[day] : [];
+        sanitizedWeek[day] = dayExercises.map((ex, i) => sanitizeExercise(ex, `import-w-${day}-${i}-${Date.now()}`));
+      });
+
+      const newWeeks = { ...weeks, [currentWeekId]: sanitizedWeek };
       setWeeks(newWeeks);
-      setSchedule(parsed);
+      setSchedule(sanitizedWeek);
       closeJsonImport();
-      showAlert('Successo', 'Settimana importata correttamente!');
+      showAlert('Successo', 'Settimana importata e sanitizzata correttamente!');
       return;
     }
 
-    // Accept both a single object or an array
-    const exercises = Array.isArray(parsed) ? parsed : [parsed];
-
-    // Light validation: must have at least a name field
-    const invalid = exercises.find(e => typeof e !== 'object' || !e.name);
-    if (invalid) {
-      setJsonImport(s => ({ ...s, error: 'Ogni esercizio deve avere almeno un campo "name".' }));
-      return;
-    }
-
-    // Normalise: assign new ids, reset done flag
+    // Day mode: Accept both a single object or an array
+    const rawExercises = Array.isArray(parsed) ? parsed : [parsed];
     const now = Date.now();
-    const normalised = exercises.map((e, i) => ({
-      type: 'Boxing',
-      notes: '',
-      plannedTime: '',
-      steps: [],
-      ...e,
-      id: (now + i).toString(),
-      done: false,
-    }));
-
-    // Ensure steps have IDs
-    normalised.forEach(ex => {
-      if (ex.steps) {
-        ex.steps = ex.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) }));
-      }
-    });
+    const normalised = rawExercises.map((e, i) => sanitizeExercise(e, `import-d-${now}-${i}`));
 
     const newSchedule = { ...schedule };
     newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
@@ -295,8 +339,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     const diff = swipeStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) < 50) return; // ignore tiny swipes
     const idx = daysOfWeek.indexOf(activeDay);
-    if (diff > 0 && idx < daysOfWeek.length - 1) setActiveDay(daysOfWeek[idx + 1]);
-    if (diff < 0 && idx > 0) setActiveDay(daysOfWeek[idx - 1]);
+    if (diff > 0 && idx < daysOfWeek.length - 1) requestDayChange(daysOfWeek[idx + 1]);
+    if (diff < 0 && idx > 0) requestDayChange(daysOfWeek[idx - 1]);
     swipeStartX.current = null;
   };
   // ─────────────────────────────────────────────────────────────────────────────
@@ -532,7 +576,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
             <button
               key={day}
               className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay && isCurrentWeek ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
-              onClick={() => setActiveDay(day)}
+              onClick={() => requestDayChange(day)}
             >
               {t('short_days')[daysOfWeek.indexOf(day)]}
               {comp && (
@@ -587,7 +631,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                       <option value="Running">Running</option>
                       <option value="Recovery">Recovery</option>
                     </select>
-                    {editForm.isCourse && editForm.courseIdx !== '' ? (
+                    {editForm.isCourse && (editForm.courseId || editForm.courseIdx !== '') ? (
                       <div style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', background: 'rgba(185, 28, 28, 0.1)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', minWidth: '80px' }}>
                         🕒 {editForm.plannedTime}
                       </div>
@@ -624,7 +668,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           <select
                             value={editForm.courseLocationId}
-                            onChange={e => setEditForm(prev => ({ ...prev, courseLocationId: e.target.value, courseIdx: '' }))}
+                            onChange={e => setEditForm(prev => ({ ...prev, courseLocationId: e.target.value, courseId: '', courseIdx: '' }))}
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', height: '42px' }}
                           >
                             <option value="">Seleziona Luogo...</option>
@@ -635,22 +679,27 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
                           {editForm.courseLocationId !== '' && (
                             <select
-                              value={editForm.courseIdx}
+                              value={editForm.courseId || editForm.courseIdx}
                               onChange={e => {
-                                const idx = e.target.value;
-                                if (idx === '') return;
+                                const val = e.target.value;
+                                if (val === '') return;
                                 const loc = profile.locations[editForm.courseLocationId];
                                 const courses = Array.isArray(loc.schedule) ? loc.schedule : [];
                                 const filtered = courses.filter(c => c.day?.toLowerCase() === activeDay.toLowerCase());
-                                const picked = filtered[idx];
+                                
+                                // Try to find by courseId first, then fallback to index for legacy support
+                                let picked = filtered.find(c => c.courseId === val);
+                                if (!picked && !isNaN(val)) {
+                                  picked = filtered[val];
+                                }
+
                                 if (picked) {
                                   setEditForm(prev => ({
                                     ...prev,
-                                    courseIdx: idx,
+                                    courseId: picked.courseId || '',
+                                    courseIdx: picked.courseId ? '' : val, // Only save index as fallback
                                     name: picked.course || prev.name,
                                     plannedTime: picked.time || prev.plannedTime,
-                                    // If the course has a specific duration field, we could use it here
-                                    // For now we'll store the index to help the duration calculator
                                   }));
                                 }
                               }}
@@ -663,7 +712,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                                 return courses
                                   .filter(c => c.day?.toLowerCase() === activeDay.toLowerCase())
                                   .map((c, i) => (
-                                    <option key={i} value={i}>{c.time} - {c.course}</option>
+                                    <option key={c.courseId || i} value={c.courseId || i}>{c.time} - {c.course}</option>
                                   ));
                               })()}
                             </select>

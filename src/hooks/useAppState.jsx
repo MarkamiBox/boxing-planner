@@ -104,7 +104,7 @@ const AppStateStoreContext = createContext(null);
 export function AppStateProvider({ children }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [store, setStore] = useState({});
-  const [storageError, setStorageError] = useState(false);
+  const [storageError, setStorageError] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -119,15 +119,26 @@ export function AppStateProvider({ children }) {
         window.localStorage.setItem('bxng_migrated_idb', 'true');
       }
 
-      const dbKeys = await keys();
-      const loaded = {};
-      for (const key of dbKeys) {
-        if (key.startsWith('bxng_')) {
-          loaded[key] = await get(key);
+      try {
+        const dbKeys = await keys();
+        const loaded = {};
+        for (const key of dbKeys) {
+          if (key.startsWith('bxng_')) {
+            try {
+              loaded[key] = await get(key);
+            } catch (e) {
+              console.error("IDB Get Error", e);
+              setStorageError(e.message || "Error reading from database");
+            }
+          }
         }
+        setStore(loaded);
+        setIsLoaded(true);
+      } catch (e) {
+        console.error("IDB Init Error", e);
+        setStorageError(e.message || "Database connection failed");
+        setIsLoaded(true); // Still load with empty store
       }
-      setStore(loaded);
-      setIsLoaded(true);
     }
     init();
   }, []);
@@ -160,14 +171,14 @@ export function useIdbStorage(key, initialValue) {
     setStore(prev => ({ ...prev, [key]: valueToStore }));
     set(key, valueToStore).catch(err => {
       console.error("IDB Save Error", err);
-      setStorageError(true);
+      setStorageError(err.message || String(err));
     });
   };
 
   const resetValue = () => {
     setStore(prev => ({ ...prev, [key]: initialValue }));
-    set(key, initialValue).catch(() => {
-      setStorageError(true);
+    set(key, initialValue).catch(err => {
+      setStorageError(err.message || String(err));
     });
   };
 

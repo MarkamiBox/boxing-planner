@@ -50,12 +50,18 @@ export function calculateDuration(workout, locations = [], day = '') {
   }
 
   // 1. Dynamic Course Duration from Profile
-  if (workout.isCourse && workout.courseLocationId !== '' && workout.courseIdx !== '' && day) {
+  if (workout.isCourse && workout.courseLocationId !== '' && (workout.courseId || workout.courseIdx !== '') && day) {
     const loc = locations[workout.courseLocationId];
     if (loc && Array.isArray(loc.schedule)) {
       const dayLower = day.toLowerCase();
       const filtered = loc.schedule.filter(c => c.day?.toLowerCase() === dayLower);
-      const picked = filtered[workout.courseIdx];
+      
+      // Try to find by courseId first, then fallback to index for legacy support
+      let picked = filtered.find(c => c.courseId === workout.courseId);
+      if (!picked && !isNaN(workout.courseIdx)) {
+        picked = filtered[workout.courseIdx];
+      }
+
       if (picked && picked.duration) return Number(picked.duration);
       if (picked && picked.endTime && picked.time) {
         const h1 = parseInt(picked.time.split(':')[0]);
