@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { get, set, del } from 'idb-keyval';
 import { useDialog } from './DialogContext';
+import { fireLogNudge } from '../services/notificationService';
 
 const TimerContext = createContext(null);
 
@@ -293,7 +294,10 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
           }
         });
       }
-      if (setActiveTab) setActiveTab('logger');
+      if (setActiveTab) {
+        setActiveTab('logger');
+        try { fireLogNudge(activeWorkout.name); } catch (e) {}
+      }
     } else {
       const nextStep = activeWorkout.steps[currentStepIdx + 1];
       setCurrentStepIdx(prev => prev + 1);

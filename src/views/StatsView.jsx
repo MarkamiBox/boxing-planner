@@ -140,9 +140,10 @@ export function StatsView({ logs, setLogs }) {
   }, [logs]);
 
   // ─── Running Analytics ───────────────────────────────────────────────────────
+  const runningLogs = useMemo(() => logs.filter(l => l.type === 'Running'), [logs]);
   const runningData = useMemo(() => {
-    const runningLogsList = logs
-      .filter(l => l.type === 'Running' && (l.distance || l.pace))
+    const runningLogsList = runningLogs
+      .filter(l => l.distance || l.pace)
       .sort((a, b) => a.date.localeCompare(b.date));
 
     return runningLogsList.map(log => ({
@@ -316,7 +317,10 @@ export function StatsView({ logs, setLogs }) {
           <div className="chart-container card">
             <h3 className="section-title">Performance Trends (Energy / Cardio / Legs)</h3>
             {trendData.length < 2 ? (
-              <div className="empty-state">Log at least 2 sessions with Energy ratings to see trends.</div>
+              <div className="empty-state" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                <div style={{ fontWeight: 600 }}>Nothing to plot yet.</div>
+                <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>Log your first session after a workout to start tracking energy, cardio, and leg fatigue over time.</div>
+              </div>
             ) : (
               <div className="chart-wrapper">
                 <ResponsiveContainer width="100%" height="100%">
@@ -404,20 +408,30 @@ export function StatsView({ logs, setLogs }) {
       {/* ── Running Analytics ── */}
       {activeTab === 'running' && (
         <>
-          <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
-            <div className="stat-card running">
-              <div className="stat-value">{totalRunningDist}km</div>
-              <div className="stat-label">Total Distance</div>
+          {runningLogs.length > 0 ? (
+            <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+              <div className="stat-card running">
+                <div className="stat-value">{totalRunningDist}km</div>
+                <div className="stat-label">Total Distance</div>
+              </div>
+              <div className="stat-card running" style={{ borderBottom: '4px solid #3b82f6' }}>
+                <div className="stat-value">{avgRunningPace}</div>
+                <div className="stat-label">Avg Pace (min/km)</div>
+              </div>
+              <div className="stat-card running">
+                <div className="stat-value">{runningLogs.length}</div>
+                <div className="stat-label">Runs</div>
+              </div>
             </div>
-            <div className="stat-card running" style={{ borderBottom: '4px solid #3b82f6' }}>
-              <div className="stat-value">{avgRunningPace}</div>
-              <div className="stat-label">Avg Pace (min/km)</div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '1rem', marginBottom: '8px' }}>No runs logged yet.</div>
+              <div style={{ fontSize: '0.85rem' }}>
+                Log a session with type "Running" and add distance or pace 
+                to see your trends here.
+              </div>
             </div>
-            <div className="stat-card running">
-              <div className="stat-value">{runningLogs.length}</div>
-              <div className="stat-label">Runs</div>
-            </div>
-          </div>
+          )}
 
           <div className="chart-container card">
             <h3 className="section-title">Distance Trend (km)</h3>
@@ -468,7 +482,7 @@ export function StatsView({ logs, setLogs }) {
         <div className="chart-container card">
           <h3 className="section-title">Weekly Training Load (last 12 weeks)</h3>
           {weeklyData.length < 2 ? (
-            <div className="empty-state">Not enough data yet. Keep logging sessions!</div>
+            <div className="empty-state">Your weekly training volume will appear here once you've logged sessions across at least 2 different weeks.</div>
           ) : (
             <div className="chart-wrapper">
               <ResponsiveContainer width="100%" height="100%">

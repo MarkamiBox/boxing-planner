@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown } from 'lucide-react';
+import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime } from '../utils';
@@ -13,7 +13,7 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
+export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs, onDirtyStateChange, workoutTemplates, setWorkoutTemplates }) {
   const { showAlert, showConfirm } = useDialog();
   const { t, language } = useAppState();
   const todayDay = getTodayDayName();
@@ -23,11 +23,16 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const [expandedId, setExpandedId] = useState(null);
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseId: '', courseIdx: '' });
   const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
   const [deletedItem, setDeletedItem] = useState(null); // { day, exercise, index }
   const undoTimerRef = useRef(null);
+  
+  React.useEffect(() => {
+    onDirtyStateChange?.(editingId !== null);
+  }, [editingId, onDirtyStateChange]);
 
   // JSON Import state
   const [jsonImport, setJsonImport] = useState({ open: false, mode: 'day', text: '', error: '' });
@@ -621,11 +626,96 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
             <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
               <Plus size={20} title={t('add_exercise')} />
             </button>
+            {workoutTemplates?.length > 0 && (
+              <button 
+                className="btn-icon" 
+                title="Load from template"
+                onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+                style={{ color: showTemplatePicker ? 'var(--primary)' : undefined }}
+              >
+                <BookOpen size={18} />
+              </button>
+            )}
           </div>
         </div>
 
+        {showTemplatePicker && workoutTemplates?.length > 0 && (
+          <div style={{ 
+            background:'var(--surface)', border:'1px solid var(--border-color)',
+            borderRadius:'8px', padding:'0.75rem', marginBottom:'1rem'
+          }}>
+            <div style={{ display:'flex', justifyContent:'space-between',
+              marginBottom:'0.5rem', fontSize:'0.85rem', fontWeight:600 }}>
+              <span>Templates</span>
+              <button 
+                onClick={() => setShowTemplatePicker(false)}
+                style={{ background:'none', border:'none', 
+                  color:'var(--text-muted)', cursor:'pointer' }}
+              >×</button>
+            </div>
+            {workoutTemplates.map(tmpl => (
+              <div key={tmpl.id} style={{ 
+                display:'flex', justifyContent:'space-between', 
+                alignItems:'center', padding:'0.4rem 0',
+                borderBottom:'1px solid var(--border-color)' 
+              }}>
+                <div>
+                  <div style={{ fontSize:'0.85rem', fontWeight:600 }}>
+                    {tmpl.name}
+                  </div>
+                  <div style={{ fontSize:'0.75rem', color:'var(--text-muted)' }}>
+                    {tmpl.type} · {tmpl.steps?.length || 0} steps
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:'0.5rem' }}>
+                  <button 
+                    className="btn-primary"
+                    style={{ padding:'0.3rem 0.6rem', fontSize:'0.75rem' }}
+                    onClick={() => {
+                      const newSchedule = { ...schedule }
+                      const newId = generateId()
+                      newSchedule[activeDay] = [
+                        ...(newSchedule[activeDay] || []),
+                        { 
+                          id: newId,
+                          type: tmpl.type,
+                          name: tmpl.name,
+                          notes: tmpl.notes || '',
+                          plannedTime: '',
+                          done: false,
+                          steps: tmpl.steps ? tmpl.steps.map(s => ({ 
+                            ...s, id: generateId() 
+                          })) : []
+                        }
+                      ]
+                      setSchedule(newSchedule)
+                      setShowTemplatePicker(false)
+                    }}
+                  >Use</button>
+                  <button 
+                    className="btn-icon danger"
+                    style={{ width:'28px', height:'28px' }}
+                    onClick={() => setWorkoutTemplates(prev => 
+                      prev.filter(t => t.id !== tmpl.id)
+                    )}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {activeExercises.length === 0 ? (
-          <div className="empty-state">{t('rest_day')}</div>
+          <div className="empty-state">
+            {t('rest_day')}
+            {activeDay === todayDay && isCurrentWeek && (
+              <div style={{ marginTop: '8px', fontSize: '0.8rem' }}>
+                Tap + to add an exercise, or ask your Coach to plan this week.
+              </div>
+            )}
+          </div>
         ) : (
           activeExercises.map((ex, exIdx) => (
             <div key={ex.id} className={`exercise-card ${ex.done ? 'done' : ''}`}>
@@ -751,6 +841,27 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                     <button className="btn-icon danger" onClick={() => deleteExercise(activeDay, ex.id)}>
                       <Trash2 size={18} />
                     </button>
+                    {editingId !== null && (
+                      <button 
+                        className="btn-secondary"
+                        style={{ fontSize:'0.8rem', padding:'0.4rem 0.6rem' }}
+                        onClick={() => {
+                          const template = {
+                            id: generateId(),
+                            name: editForm.name,
+                            type: editForm.type,
+                            notes: editForm.notes,
+                            steps: editForm.steps,
+                            savedAt: new Date().toISOString()
+                          }
+                          setWorkoutTemplates(prev => [template, ...prev])
+                          showAlert('Template saved', 
+                            `"${editForm.name}" saved as a template.`)
+                        }}
+                      >
+                        Save template
+                      </button>
+                    )}
                     <div style={{ flex: 1 }}></div>
                     <button className="btn-secondary" onClick={() => setEditingId(null)}>
                       <X size={18} /> Cancel

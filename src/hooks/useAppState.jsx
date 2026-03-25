@@ -209,6 +209,7 @@ export function useAppState() {
   const [pendingTools, setPendingTools] = useState(null);
   const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
   const [language, setLanguage] = useIdbStorage('bxng_language', 'en');
+  const [workoutTemplates, setWorkoutTemplates] = useIdbStorage('bxng_workout_templates', []);
 
   const t = (key) => {
     const keys = key.split('.');
@@ -266,6 +267,7 @@ export function useAppState() {
     availabilityTemplate, setAvailabilityTemplate,
     sessionNotes, setSessionNotes,
     storageError, setStorageError,
-    language, setLanguage, t
+    language, setLanguage, t,
+    workoutTemplates, setWorkoutTemplates
   };
 }

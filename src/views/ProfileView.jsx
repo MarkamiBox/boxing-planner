@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Copy, Save, Check, Download, Upload, Plus, Trash2, Target, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { requestNotificationPermission } from '../services/notificationService';
 import { get, set, keys as idbKeys } from 'idb-keyval';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
@@ -13,6 +14,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expandedLocs, setExpandedLocs] = useState({});
+  const [, setTick] = useState(0);
 
   const toggleLoc = (idx) => setExpandedLocs(p => ({ ...p, [idx]: !p[idx] }));
 
@@ -683,6 +685,33 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
             <span className="slider-toggle"></span>
           </label>
           <label htmlFor="mealBuffer" style={{ marginBottom: 0, cursor: 'pointer' }}>Enable Meal Buffer (Auto-schedule around meals)</label>
+        </div>
+
+        <div className="form-group" style={{ display:'flex', alignItems:'center', 
+          gap:'0.75rem', gridColumn:'1 / -1' }}>
+          <label className="switch">
+            <input 
+              type="checkbox" 
+              checked={Notification.permission === 'granted'}
+              onChange={async (e) => {
+                if (e.target.checked) {
+                  await requestNotificationPermission();
+                  setTick(t => t + 1);
+                }
+              }}
+              id="notifToggle" 
+            />
+            <span className="slider-toggle"></span>
+          </label>
+          <label htmlFor="notifToggle" style={{ marginBottom:0, cursor:'pointer' }}>
+            Session reminders &amp; log nudges
+            {Notification.permission === 'denied' && (
+              <span style={{ marginLeft:'8px', fontSize:'0.75rem', 
+                color:'#f59e0b' }}>
+                (blocked in browser settings)
+              </span>
+            )}
+          </label>
         </div>
       </div>
 
