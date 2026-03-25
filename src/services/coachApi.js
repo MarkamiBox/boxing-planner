@@ -234,7 +234,7 @@ ${profile.locations?.length > 0
       : '  No locations — ask athlete before programming equipment work'}
 ${profile.chronotype ? `
 Scheduling Context:
-  Chronotype: ${profile.chronotype}, functional after ${profile.wakeupRampMinutes || 60}min, job load: ${profile.jobLoad || 'unknown'}, physical commute: ${profile.physicalCommuteMinutes || 0}min` : ''}
+  Chronotype: ${profile.chronotype}, functional after ${profile.wakeupRampMinutes || 60}min, job load: ${profile.jobLoad || 'unknown'}` : ''}
 ${availability && Object.keys(availability).length > 0 ? `  Availability this week: ${compressAvailability(availability, locations || profile.locations || [], profile)}` : ''}
 ${(() => {
       const patterns = detectSkipPatterns(logs, weeks, currentWeekId);
@@ -707,7 +707,7 @@ NOTE: If this intent doesn't match what the athlete actually asked, ignore the l
 2. ENERGY MATCHING: Fresh window = any session type valid. Post-work drained = technical or mobility only, never conditioning or sparring. After 20:00 or before chronotype peak window = no high CNS demand. Family commitments = buffer both sides, athlete must arrive mentally fresh not physically tired.
 3. WINDOW FITTING: Under 20min = micro only (neck protocol, visualization, grip work, light rope technique). 20-45min = home or shadow only. 45-75min = single focus one location. 75min+ = full structured session. When 10-20min short: compress rest max 15 seconds, remove warm-up if athlete traveled to location, move cool-down to home with a note. Never compress main work block below 20min.
 4. SHIFT BEFORE COMPRESS: Prime window tomorrow always beats compressed window today. Shifting preferred over compressing. Three or more compressed sessions this week = next prime window is recovery regardless of periodization plan. Tell athlete explicitly when you shift something and why.
-5. FIXED ANCHORS AND PATTERNS: Fixed class times with fixedClassTimes field are sacred, never move or schedule conflicts in adjacent slots that affect travel time. Recurring skip pattern on specific day/time slot = treat as soft-unavailable, do not force sessions there, mention pattern to athlete. A completed 20min session beats a skipped 75min session.
+5. FIXED ANCHORS AND PATTERNS: Gym courses defined in a location's schedule are sacred, never move or schedule conflicts in adjacent slots that affect travel time. Recurring skip pattern on specific day/time slot = treat as soft-unavailable, do not force sessions there, mention pattern to athlete. A completed 20min session beats a skipped 75min session.
 6. CONTEXT OVERRIDES: Competition goal under 8 weeks = protect rest windows even if technically free, taper logic takes precedence. Travel week = check travelTrainingStyle before planning, if null ask athlete first. Meal conflict within 90min of likely meal time = flag in session notes only, do not block. Weather likely poor for outdoor session = always prepare indoor alternative in session notes. Soft commitments can be flagged for rescheduling if they conflict with critical windows. Hard commitments are sacred.
 7. COURSES AND FIXED CLASSES: If a session is a fixed gym class, ALWAYS set 'isCourse: true' in the exercise object. You MUST select the specific course by setting 'courseIdx'. IMPORTANT: You CANNOT change the 'plannedTime' of a course; it must strictly match the time defined in the profile's course schedule. Courses are anchors and cannot be rescheduled.` : '',
 

@@ -4,7 +4,7 @@ import { calculateDuration } from '../utils';
 import { BodyDummy } from '../components/BodyDummy';
 import './logger.css';
 
-export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext, sessionNotes, clearSessionNotes }) {
+export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext, sessionNotes, clearSessionNotes }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
   const recentLogWithWeight = logs?.find(l => l.bodyWeight);

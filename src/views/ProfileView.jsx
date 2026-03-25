@@ -38,9 +38,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
         equipment: '',
         travelMinutes: 0,
         showerAvailable: false,
-        lockerAvailable: false,
-        isFixedClass: false,
-        fixedClassTimes: []
+        lockerAvailable: false
       }]
     }));
   };
@@ -575,42 +573,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                   <span className="slider-toggle"></span>
                 </label>
                 <span style={{ marginLeft: '-0.5rem' }}>Locker</span>
-                <label className="switch">
-                  <input type="checkbox" checked={!!loc.isFixedClass} onChange={e => handleLocationChange(idx, 'isFixedClass', e.target.checked)} />
-                  <span className="slider-toggle"></span>
-                </label>
-                <span style={{ marginLeft: '-0.5rem' }}>Fixed Class Schedule</span>
               </div>
-              {loc.isFixedClass && (
-                <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-hover)', borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Fixed Class Times</span>
-                    <button className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.7rem' }} onClick={() => {
-                      const current = loc.fixedClassTimes || [];
-                      handleLocationChange(idx, 'fixedClassTimes', [...current, { day: 'Monday', time: '18:00' }]);
-                    }}><Plus size={12} /> Add Row</button>
-                  </div>
-                  {(loc.fixedClassTimes || []).map((ct, ctIdx) => (
-                    <div key={ctIdx} style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.25rem', alignItems: 'center' }}>
-                      <select value={ct.day} onChange={e => {
-                        const newTimes = [...loc.fixedClassTimes];
-                        newTimes[ctIdx].day = e.target.value;
-                        handleLocationChange(idx, 'fixedClassTimes', newTimes);
-                      }} style={{ fontSize: '0.75rem', padding: '2px' }}>
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                      <input type="time" value={ct.time} onChange={e => {
-                        const newTimes = [...loc.fixedClassTimes];
-                        newTimes[ctIdx].time = e.target.value;
-                        handleLocationChange(idx, 'fixedClassTimes', newTimes);
-                      }} style={{ fontSize: '0.75rem', padding: '2px' }} />
-                      <button className="btn-icon danger" style={{ padding: '2px' }} onClick={() => {
-                        handleLocationChange(idx, 'fixedClassTimes', loc.fixedClassTimes.filter((_, i) => i !== ctIdx));
-                      }}><Trash2 size={12} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   {loc.schedule ? `✅ ${Array.isArray(loc.schedule) ? loc.schedule.length : Object.keys(loc.schedule).length} courses loaded` : `No courses schedule loaded`}
@@ -723,10 +686,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Physical commute one-way (min)</label>
-          <input type="number" value={localProfile.physicalCommuteMinutes} onChange={e => handleChange('physicalCommuteMinutes', Number(e.target.value))} />
-        </div>
+
 
         <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', gridColumn: '1 / -1' }}>
           <label className="switch">

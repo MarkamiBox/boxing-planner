@@ -26,7 +26,6 @@ const initialProfile = {
   consecutiveDaysPreference: 'flexible',
   weatherThreshold: 'light_ok',
   travelTrainingStyle: null,
-  physicalCommuteMinutes: 0,
   mealBufferEnabled: false,
   locations: []
 };
