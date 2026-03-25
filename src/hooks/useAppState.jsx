@@ -186,8 +186,9 @@ export function useAppState() {
   const [pendingWeekProposal, setPendingWeekProposal] = useIdbStorage('bxng_pending_week_proposal', null);
   const [availability, setAvailability] = useIdbStorage('bxng_availability', {});
   const [availabilityTemplate, setAvailabilityTemplate] = useIdbStorage('bxng_availability_template', {});
-  const [pendingTools, setPendingTools] = useState(null);
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
+  const [pendingTools, setPendingTools] = useState(null);
+  const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
 
   useEffect(() => {
     const todayWeekId = getWeekId();
@@ -227,6 +228,7 @@ export function useAppState() {
     pendingCoachContext, setPendingCoachContext,
     pendingTools, setPendingTools,
     availability, setAvailability,
-    availabilityTemplate, setAvailabilityTemplate
+    availabilityTemplate, setAvailabilityTemplate,
+    sessionNotes, setSessionNotes
   };
 }

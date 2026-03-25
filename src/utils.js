@@ -57,7 +57,7 @@ export function calculateDuration(workout, locations = [], day = '') {
       const filtered = loc.schedule.filter(c => c.day?.toLowerCase() === dayLower);
       const picked = filtered[workout.courseIdx];
       if (picked && picked.duration) return Number(picked.duration);
-      if (picked && picked.endTime) {
+      if (picked && picked.endTime && picked.time) {
         const h1 = parseInt(picked.time.split(':')[0]);
         const m1 = parseInt(picked.time.split(':')[1]);
         const h2 = parseInt(picked.endTime.split(':')[0]);

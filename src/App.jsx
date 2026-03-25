@@ -16,7 +16,7 @@ import { GlobalTimerBar } from './components/GlobalTimerBar';
 function AppContent() {
   const [activeTab, setActiveTab] = useIdbStorage('bxng_active_tab', 'schedule');
   const appState = useAppState();
-  const [sessionNotes, setSessionNotes] = useState([]);
+  const { sessionNotes, setSessionNotes } = appState;
 
   const addSessionNote = (note) => {
     setSessionNotes(prev => [note, ...prev]);

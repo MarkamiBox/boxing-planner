@@ -56,7 +56,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
 
   // Stats tracking
-  const statsTracker = useRef({ actualDuration: 0, skippedSteps: 0, lastActive: null });
+  const statsTracker = useRef({ actualDuration: 0, lastActive: null });
   const plannedDuration = useRef(0);
 
   const isGuided = activeWorkout && activeWorkout.steps && activeWorkout.steps.length > 0;
@@ -132,7 +132,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         if (step.type === 'sets') return acc + ((step.rest || 60) * (step.sets || 1));
         return acc;
       }, 0);
-      statsTracker.current = { actualDuration: 0, skippedSteps: 0, lastActive: null };
+      statsTracker.current = { actualDuration: 0, lastActive: null };
     }
   }, [activeWorkout, isGuided, phase, currentStepIdx]);
 
@@ -260,8 +260,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
           ...activeWorkout,
           timerStats: {
             actualDuration: statsTracker.current.actualDuration,
-            plannedDuration: plannedDuration.current,
-            skippedSteps: statsTracker.current.skippedSteps
+            plannedDuration: plannedDuration.current
           }
         });
       }
@@ -359,8 +358,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         ...activeWorkout,
         timerStats: {
           actualDuration: statsTracker.current.actualDuration,
-          plannedDuration: plannedDuration.current,
-          skippedSteps: statsTracker.current.skippedSteps
+          plannedDuration: plannedDuration.current
         }
       };
       showConfirm(
@@ -373,7 +371,6 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   };
 
   const skipStep = () => {
-    statsTracker.current.skippedSteps += 1;
     delete timerRef.current.expectedEndTime;
     if (!isGuided) {
       if (phase === 'work' && currentRound < totalRounds) {
@@ -450,7 +447,6 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       return;
     }
 
-    statsTracker.current.skippedSteps = Math.max(0, statsTracker.current.skippedSteps - 1);
     const prevStepIdx = currentStepIdx - 1;
     const prevStep = activeWorkout.steps[prevStepIdx];
 
