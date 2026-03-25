@@ -3,6 +3,11 @@
   to { transform: translateY(0); }
 }
 
+@keyframes slideUpUndo {
+  from { transform: translate(-50%, 100%); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
 .schedule-view {
   max-width: 800px;
   margin: 0 auto;

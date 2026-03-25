@@ -3,6 +3,7 @@ import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, Chev
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime } from '../utils';
+import { useAppState } from '../hooks/useAppState';
 import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
@@ -10,6 +11,7 @@ const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sat
 
 export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
+  const { t, language } = useAppState();
   const todayDay = getTodayDayName();
   const isCurrentWeek = currentWeekId === getWeekId();
   const [activeDay, setActiveDay] = useState(todayDay);
@@ -20,6 +22,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseIdx: '' });
   const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
+  const [deletedItem, setDeletedItem] = useState(null); // { day, exercise, index }
+  const undoTimerRef = useRef(null);
 
   // JSON Import state
   const [jsonImport, setJsonImport] = useState({ open: false, mode: 'day', text: '', error: '' });
@@ -47,8 +51,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     const end = new Date(ISOweekStart);
     end.setDate(end.getDate() + 6);
 
-    const format = (d) => d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
-    return `${format(ISOweekStart)} al ${format(end)}`;
+    const format = (d) => d.toLocaleDateString(language === 'it' ? 'it-IT' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+    return language === 'it' ? `${format(ISOweekStart)} al ${format(end)}` : `${format(ISOweekStart)} to ${format(end)}`;
   };
 
   const changeWeek = (direction) => {
@@ -129,9 +133,33 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   };
 
   const deleteExercise = (day, exerciseId) => {
+    const exerciseToDelete = schedule[day].find(e => e.id === exerciseId);
+    const exerciseIdx = schedule[day].findIndex(e => e.id === exerciseId);
+    if (!exerciseToDelete) return;
+
+    setDeletedItem({ day, exercise: exerciseToDelete, index: exerciseIdx });
+
     const newSchedule = { ...schedule };
     newSchedule[day] = newSchedule[day].filter(e => e.id !== exerciseId);
     setSchedule(newSchedule);
+    setEditingId(null);
+
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => {
+      setDeletedItem(null);
+    }, 5000);
+  };
+
+  const undoDelete = () => {
+    if (!deletedItem) return;
+    const { day, exercise, index } = deletedItem;
+    const newSchedule = { ...schedule };
+    const arr = [...(newSchedule[day] || [])];
+    arr.splice(index, 0, exercise);
+    newSchedule[day] = arr;
+    setSchedule(newSchedule);
+    setDeletedItem(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   };
 
   const moveExercise = (day, idx, dir) => {
@@ -281,22 +309,29 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   const updateStep = (idx, field, value) => {
     const newSteps = [...editForm.steps];
-    newSteps[idx][field] = value;
-    
-    // Auto-populate default fields if type changes
+    let step = { ...newSteps[idx] };
+
     if (field === 'type') {
-       if (value === 'timer' || value === 'manual_timer') {
-         newSteps[idx].duration = newSteps[idx].duration || 180;
-       } else if (value === 'interval') {
-         newSteps[idx].work = newSteps[idx].work || 180;
-         newSteps[idx].rest = newSteps[idx].rest || 60;
-         newSteps[idx].rounds = newSteps[idx].rounds || 3;
-       } else if (value === 'sets') {
-         newSteps[idx].sets = newSteps[idx].sets || 3;
-         newSteps[idx].reps = newSteps[idx].reps || '10 reps';
-         newSteps[idx].rest = newSteps[idx].rest || 60;
-       }
+      const { id, name, instruction } = step;
+      // Start fresh with common fields only
+      step = { id, name, type: value, instruction };
+
+      if (value === 'timer' || value === 'manual_timer') {
+        step.duration = 180;
+      } else if (value === 'interval') {
+        step.work = 180;
+        step.rest = 60;
+        step.rounds = 3;
+      } else if (value === 'sets') {
+        step.sets = 3;
+        step.reps = '10 reps';
+        step.rest = 60;
+      }
+    } else {
+      step[field] = value;
     }
+
+    newSteps[idx] = step;
     setEditForm({ ...editForm, steps: newSteps });
   };
 
@@ -442,7 +477,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   return (
     <div className="page-container schedule-view">
       <div className="schedule-header">
-        <h1 className="page-title">Schedule</h1>
+        <h1 className="page-title">{t('schedule')}</h1>
         {currentWeekId && (
           <div className="week-nav">
             <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20} /></button>
@@ -455,9 +490,9 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
               </button>
               {cloneMenuOpen && (
                 <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.25rem', zIndex: 100, minWidth: '160px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', marginTop: '4px' }}>
-                  <button onClick={handleCloneLastWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><Copy size={14} style={{ marginRight: '6px' }} /> Clone last week</button>
-                  <button onClick={() => { setJsonImport({ open: true, mode: 'week', text: '', error: '' }); setCloneMenuOpen(false); }} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><FileCode2 size={14} style={{ marginRight: '6px' }} /> Import Week JSON</button>
-                  <button onClick={handleClearWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--primary)', fontSize: '0.85rem' }}><Trash2 size={14} style={{ marginRight: '6px' }} /> Start blank</button>
+                  <button onClick={handleCloneLastWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><Copy size={14} style={{ marginRight: '6px' }} /> {t('clone_last_week')}</button>
+                  <button onClick={() => { setJsonImport({ open: true, mode: 'week', text: '', error: '' }); setCloneMenuOpen(false); }} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><FileCode2 size={14} style={{ marginRight: '6px' }} /> {t('import_week_json')}</button>
+                  <button onClick={handleClearWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--primary)', fontSize: '0.85rem' }}><Trash2 size={14} style={{ marginRight: '6px' }} /> {t('start_blank')}</button>
                 </div>
               )}
             </div>
@@ -465,6 +500,30 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
           </div>
         )}
       </div>
+
+      {deletedItem && (
+        <div className="undo-banner" style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--surface)',
+          border: '1px solid var(--primary)',
+          color: 'var(--text-main)',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          zIndex: 2000,
+          animation: 'slideUpUndo 0.3s ease-out'
+        }}>
+          <span style={{ fontSize: '0.9rem' }}>{t('exercise_deleted')} ({deletedItem.exercise.name})</span>
+          <button className="btn-primary" onClick={undoDelete} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>{t('undo')}</button>
+          <button onClick={() => setDeletedItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
+        </div>
+      )}
 
       <div className="days-selector">
         {daysOfWeek.map(day => {
@@ -475,7 +534,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
               className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay && isCurrentWeek ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
               onClick={() => setActiveDay(day)}
             >
-              {day.substring(0, 3).toUpperCase()}
+              {t('short_days')[daysOfWeek.indexOf(day)]}
               {comp && (
                 <span style={{ display: 'block', fontSize: '0.6rem', opacity: 0.8, marginTop: '1px' }}>
                   {comp.done}/{comp.total}
@@ -492,21 +551,21 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       >
         <div className="list-header">
           <div>
-            <h2>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}'s Session</h2>
+            <h2>{t(`days.${activeDay}`)}</h2>
             {getDayTotalDuration() && <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '2px' }}>{getDayTotalDuration()}</div>}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="btn-icon import-json-btn" title="Import exercises from JSON" onClick={() => setJsonImport({ open: true, mode: 'day', text: '', error: '' })}>
+            <button className="btn-icon import-json-btn" title={t('import_json')} onClick={() => setJsonImport({ open: true, mode: 'day', text: '', error: '' })}>
               <FileCode2 size={18} />
             </button>
             <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
-              <Plus size={20} />
+              <Plus size={20} title={t('add_exercise')} />
             </button>
           </div>
         </div>
 
         {activeExercises.length === 0 ? (
-          <div className="empty-state">Rest day. No exercises planned.</div>
+          <div className="empty-state">{t('rest_day')}</div>
         ) : (
           activeExercises.map((ex, exIdx) => (
             <div key={ex.id} className={`exercise-card ${ex.done ? 'done' : ''}`}>

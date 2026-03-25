@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { get, set, keys } from 'idb-keyval';
 import { getWeekId } from '../utils';
+import { translations } from '../translations';
 
 const APP_VERSION = 'v5'; // Update Presets
 
@@ -103,6 +104,7 @@ const AppStateStoreContext = createContext(null);
 export function AppStateProvider({ children }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [store, setStore] = useState({});
+  const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -140,7 +142,7 @@ export function AppStateProvider({ children }) {
   }
 
   return (
-    <AppStateStoreContext.Provider value={{ store, setStore }}>
+    <AppStateStoreContext.Provider value={{ store, setStore, storageError, setStorageError }}>
       {children}
     </AppStateStoreContext.Provider>
   );
@@ -149,25 +151,31 @@ export function AppStateProvider({ children }) {
 export function useIdbStorage(key, initialValue) {
   const ctx = useContext(AppStateStoreContext);
   if (!ctx) throw new Error("useIdbStorage must be used within AppStateProvider");
-  const { store, setStore } = ctx;
+  const { store, setStore, storageError, setStorageError } = ctx;
 
   const storedValue = store[key] !== undefined ? store[key] : initialValue;
 
   const setValue = (value) => {
     const valueToStore = value instanceof Function ? value(storedValue) : value;
     setStore(prev => ({ ...prev, [key]: valueToStore }));
-    set(key, valueToStore).catch(err => console.error("IDB Save Error", err));
+    set(key, valueToStore).catch(err => {
+      console.error("IDB Save Error", err);
+      setStorageError(true);
+    });
   };
 
   const resetValue = () => {
     setStore(prev => ({ ...prev, [key]: initialValue }));
-    set(key, initialValue).catch(() => { });
+    set(key, initialValue).catch(() => {
+      setStorageError(true);
+    });
   };
 
-  return [storedValue, setValue, resetValue];
+  return [storedValue, setValue, resetValue, storageError, setStorageError];
 }
 
 export function useAppState() {
+  const { storageError, setStorageError } = useContext(AppStateStoreContext);
   const [appVersion, setAppVersion] = useIdbStorage('bxng_app_version', '');
   const [profile, setProfile] = useIdbStorage('bxng_profile', initialProfile);
   const [weeks, setWeeks] = useIdbStorage('bxng_weeks', null);
@@ -189,6 +197,17 @@ export function useAppState() {
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
   const [pendingTools, setPendingTools] = useState(null);
   const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
+  const [language, setLanguage] = useIdbStorage('bxng_language', 'en');
+
+  const t = (key) => {
+    const keys = key.split('.');
+    let val = translations[language] || translations['en'];
+    for(const k of keys) {
+      if (val[k] !== undefined) val = val[k];
+      else return key;
+    }
+    return val;
+  };
 
   useEffect(() => {
     const todayWeekId = getWeekId();
@@ -229,6 +248,8 @@ export function useAppState() {
     pendingTools, setPendingTools,
     availability, setAvailability,
     availabilityTemplate, setAvailabilityTemplate,
-    sessionNotes, setSessionNotes
+    sessionNotes, setSessionNotes,
+    storageError, setStorageError,
+    language, setLanguage, t
   };
 }

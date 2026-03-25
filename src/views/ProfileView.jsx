@@ -208,23 +208,12 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
         label: "Copy to Clipboard",
         onClick: () => {
           const text = JSON.stringify(dataObj, null, 2);
-          if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-              showAlert("Success", `${title} copied to clipboard!`);
-            });
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text)
+              .then(() => showAlert("Success", `${title} copied to clipboard!`))
+              .catch(() => showAlert("Error", "Copia fallita, il tuo browser non lo supporta. Usa la funzione di Download JSON"));
           } else {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-              document.execCommand('copy');
-              showAlert("Success", `${title} copied to clipboard!`);
-            } catch (err) {
-              showAlert('Error', 'Copy failed. Try downloading instead.');
-            }
-            document.body.removeChild(textArea);
+            showAlert("Error", "Copia fallita, il tuo browser non lo supporta. Usa la funzione di Download JSON");
           }
         }
       },
@@ -442,25 +431,15 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     }
 
 
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => showAlert("Error", "Copia fallita, il tuo browser non lo supporta. Usa la funzione di Download JSON"));
     } else {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        showAlert('Errore', 'Copy failed. Review console.');
-      }
-      document.body.removeChild(textArea);
+      showAlert("Error", "Copia fallita, il tuo browser non lo supporta. Usa la funzione di Download JSON");
     }
   };
 
