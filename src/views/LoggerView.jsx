@@ -146,7 +146,6 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
       sleepHours: sleepHours ? Number(sleepHours) : null,
       sleepQuality,
       bodyMap: Object.keys(bodyMap).length > 0 ? bodyMap : undefined,
-      skippedSteps: activeWorkout?.timerStats?.skippedSteps || 0,
       plannedDuration: activeWorkout?.timerStats?.plannedDuration || 0,
       ...specificData
     };
@@ -483,18 +482,14 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
                     </div>
                   </div>
 
+
+                  {renderEditSlider('Qualità Sonno', 'sleepQuality')}
                   <div className="form-row" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Skipped Steps</label>
-                      <input type="number" min="0" value={editDraft.skippedSteps || 0} onChange={e => setEditDraft(d => ({ ...d, skippedSteps: Number(e.target.value) }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
-                    </div>
                     <div className="form-group" style={{ flex: 1 }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Planned Dur.</label>
                       <input type="number" min="0" value={editDraft.plannedDuration || 0} onChange={e => setEditDraft(d => ({ ...d, plannedDuration: Number(e.target.value) }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem' }} />
                     </div>
                   </div>
-
-                  {renderEditSlider('Qualità Sonno', 'sleepQuality')}
 
                   {/* Soreness Map Editing */}
                   <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '0.75rem' }}>
@@ -555,11 +550,6 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
                     {log.sparringRounds > 0 && <span>🥊 {log.sparringRounds} rnd</span>}
                   </div>
                   {log.notes && <div style={{ marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{log.notes}</div>}
-                  {log.skippedSteps > 0 && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '4px' }}>
-                      ⏭ Skipped {log.skippedSteps} guided steps
-                    </div>
-                  )}
                   {log.bodyMap && Object.keys(log.bodyMap).length > 0 && (
                     <div style={{ marginTop: '6px' }}>
                       <button
