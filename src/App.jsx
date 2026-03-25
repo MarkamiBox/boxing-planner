@@ -16,8 +16,8 @@ import { GlobalTimerBar } from './components/GlobalTimerBar';
 function AppContent() {
   const [activeTab, setActiveTab] = useIdbStorage('bxng_active_tab', 'schedule');
   const appState = useAppState();
-  const { sessionNotes, setSessionNotes } = appState;
-
+  const { sessionNotes, setSessionNotes, storageError } = appState;
+  
   const addSessionNote = (note) => {
     setSessionNotes(prev => [note, ...prev]);
   };
@@ -45,6 +45,20 @@ function AppContent() {
       addSessionNote={addSessionNote}
     >
       <div className="app-container">
+        {storageError && (
+          <div style={{
+            backgroundColor: '#ff4444',
+            color: 'white',
+            padding: '10px',
+            textAlign: 'center',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            zIndex: 1000,
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+          }}>
+            ⚠️ Errore di salvataggio: la memoria locale è piena o bloccata. I dati potrebbero non essere salvati.
+          </div>
+        )}
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         <div className="main-content">
           {renderView()}
