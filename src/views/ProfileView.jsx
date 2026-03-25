@@ -4,8 +4,9 @@ import { get, set, keys as idbKeys } from 'idb-keyval';
 import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
+import { AvailabilityCalendar } from '../components/AvailabilityCalendar';
 
-export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals }) {
+export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals, availability, setAvailability, availabilityTemplate, setAvailabilityTemplate }) {
   // Hook usage moved down to line 16 for additional features
 
   const [localProfile, setLocalProfile] = useState(profile);
@@ -32,7 +33,15 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
   const addLocation = () => {
     setLocalProfile(prev => ({
       ...prev,
-      locations: [...(prev.locations || []), { name: '', equipment: '' }]
+      locations: [...(prev.locations || []), {
+        name: '',
+        equipment: '',
+        travelMinutes: 0,
+        showerAvailable: false,
+        lockerAvailable: false,
+        isFixedClass: false,
+        fixedClassTimes: []
+      }]
     }));
   };
 
@@ -49,6 +58,87 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       newLocs[idx][field] = value;
       return { ...prev, locations: newLocs };
     });
+  };
+
+  const handleExportAvailability = () => {
+    const data = JSON.stringify(availability, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boxing_availability_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  const normalizeAvailability = (data) => {
+    if (!data || typeof data !== 'object') return {};
+    const normalized = {};
+    Object.keys(data).forEach(day => {
+      if (!Array.isArray(data[day])) {
+          normalized[day] = [];
+          return;
+      }
+      normalized[day] = data[day].map(slot => {
+          if (slot.reason) return slot; // already correct format
+          return {
+            id: slot.id || Math.random().toString(36).substr(2, 9),
+            start: slot.start || '09:00',
+            end: slot.end || '10:00',
+            reason: 'other',
+            customReason: slot.title || 'Other',
+            importance: slot.isHard ? 'hard' : 'soft',
+            energyAfter: 'neutral',
+            isRecurring: false
+          };
+      });
+    });
+    return normalized;
+  };
+
+  const handleImportAvailability = () => {
+    showChoice("Import Availability", "How would you like to import your weekly availability?", [
+      {
+        label: "Upload JSON File",
+        onClick: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              try {
+                const data = JSON.parse(ev.target.result);
+                setAvailability(normalizeAvailability(data));
+                showAlert("Success", "Availability imported successfully!");
+              } catch (err) {
+                showAlert("Error", "Invalid JSON file.");
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }
+      },
+      {
+        label: "Paste JSON Text",
+        onClick: () => {
+          const initial = availability ? JSON.stringify(availability, null, 2) : '';
+          showPrompt("Paste Availability", "Paste your availability JSON object here:", initial, (text) => {
+            if (!text) return;
+            try {
+              const data = JSON.parse(text);
+              setAvailability(normalizeAvailability(data));
+              showAlert("Success", "Availability updated!");
+            } catch (err) {
+              showAlert("Error", "Invalid JSON text.");
+            }
+          });
+        }
+      }
+    ]);
   };
 
   const handleAttachLocationSchedule = (idx) => {
@@ -470,6 +560,57 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
                 <input type="text" value={loc.equipment} onChange={e => handleLocationChange(idx, 'equipment', e.target.value)} placeholder="Equipment (e.g. Heavy Bag, Dumbbells)" style={{ flex: 2 }} />
                 <button className="btn-icon danger" onClick={() => removeLocation(idx)} style={{ padding: '6px' }}><Trash2 size={16} /></button>
               </div>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <label>Travel (min)</label>
+                  <input type="number" value={loc.travelMinutes || 0} onChange={e => handleLocationChange(idx, 'travelMinutes', Number(e.target.value))} style={{ width: '50px', padding: '2px 4px' }} />
+                </div>
+                <label className="switch">
+                  <input type="checkbox" checked={!!loc.showerAvailable} onChange={e => handleLocationChange(idx, 'showerAvailable', e.target.checked)} />
+                  <span className="slider-toggle"></span>
+                </label>
+                <span style={{ marginLeft: '-0.5rem' }}>Shower</span>
+                <label className="switch">
+                  <input type="checkbox" checked={!!loc.lockerAvailable} onChange={e => handleLocationChange(idx, 'lockerAvailable', e.target.checked)} />
+                  <span className="slider-toggle"></span>
+                </label>
+                <span style={{ marginLeft: '-0.5rem' }}>Locker</span>
+                <label className="switch">
+                  <input type="checkbox" checked={!!loc.isFixedClass} onChange={e => handleLocationChange(idx, 'isFixedClass', e.target.checked)} />
+                  <span className="slider-toggle"></span>
+                </label>
+                <span style={{ marginLeft: '-0.5rem' }}>Fixed Class Schedule</span>
+              </div>
+              {loc.isFixedClass && (
+                <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-hover)', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Fixed Class Times</span>
+                    <button className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.7rem' }} onClick={() => {
+                      const current = loc.fixedClassTimes || [];
+                      handleLocationChange(idx, 'fixedClassTimes', [...current, { day: 'Monday', time: '18:00' }]);
+                    }}><Plus size={12} /> Add Row</button>
+                  </div>
+                  {(loc.fixedClassTimes || []).map((ct, ctIdx) => (
+                    <div key={ctIdx} style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.25rem', alignItems: 'center' }}>
+                      <select value={ct.day} onChange={e => {
+                        const newTimes = [...loc.fixedClassTimes];
+                        newTimes[ctIdx].day = e.target.value;
+                        handleLocationChange(idx, 'fixedClassTimes', newTimes);
+                      }} style={{ fontSize: '0.75rem', padding: '2px' }}>
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input type="time" value={ct.time} onChange={e => {
+                        const newTimes = [...loc.fixedClassTimes];
+                        newTimes[ctIdx].time = e.target.value;
+                        handleLocationChange(idx, 'fixedClassTimes', newTimes);
+                      }} style={{ fontSize: '0.75rem', padding: '2px' }} />
+                      <button className="btn-icon danger" style={{ padding: '2px' }} onClick={() => {
+                        handleLocationChange(idx, 'fixedClassTimes', loc.fixedClassTimes.filter((_, i) => i !== ctIdx));
+                      }}><Trash2 size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   {loc.schedule ? `✅ ${Array.isArray(loc.schedule) ? loc.schedule.length : Object.keys(loc.schedule).length} courses loaded` : `No courses schedule loaded`}
@@ -508,6 +649,123 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
             {saved ? 'Saved!' : 'Save Profile Changes'}
           </button>
         </div>
+      </div>
+
+      <div className="card profile-grid" style={{ marginTop: '2rem' }}>
+        <h3 className="section-title" style={{ gridColumn: '1 / -1' }}>Training Preferences</h3>
+
+        <div className="form-group">
+          <label>Chronotype (Energy Peak)</label>
+          <select value={localProfile.chronotype} onChange={e => handleChange('chronotype', e.target.value)}>
+            <option value="morning_sharp">Morning sharp</option>
+            <option value="mid_morning_ramp">Mid-morning ramp 1-2h</option>
+            <option value="afternoon_evening">Afternoon-Evening peak after 15:00</option>
+            <option value="inconsistent">Inconsistent</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Minutes to feel functional after waking (default 60)</label>
+          <input type="number" value={localProfile.wakeupRampMinutes} onChange={e => handleChange('wakeupRampMinutes', Number(e.target.value))} />
+        </div>
+
+        <div className="form-group">
+          <label>Job Load (Stress/Fatigue)</label>
+          <select value={localProfile.jobLoad} onChange={e => handleChange('jobLoad', e.target.value)}>
+            <option value="desk_low">Desk low stress</option>
+            <option value="desk_high">Desk high cognitive stress</option>
+            <option value="physical">Physical all day</option>
+            <option value="variable">Variable</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Sleep Consistency</label>
+          <select value={localProfile.sleepConsistency} onChange={e => handleChange('sleepConsistency', e.target.value)}>
+            <option value="very_consistent">Very consistent</option>
+            <option value="mostly">Mostly consistent</option>
+            <option value="irregular">Irregular</option>
+            <option value="chronic_short">Chronically short under 6h</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Minimum session worth doing (min)</label>
+          <input type="number" value={localProfile.minSessionMinutes} onChange={e => handleChange('minSessionMinutes', Number(e.target.value))} />
+        </div>
+
+        <div className="form-group">
+          <label>Consecutive Days Preference</label>
+          <select value={localProfile.consecutiveDaysPreference} onChange={e => handleChange('consecutiveDaysPreference', e.target.value)}>
+            <option value="alternate">Alternate work-rest days</option>
+            <option value="consecutive">Consecutive days then rest block</option>
+            <option value="flexible">Flexible</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Weather Threshold</label>
+          <select value={localProfile.weatherThreshold} onChange={e => handleChange('weatherThreshold', e.target.value)}>
+            <option value="any">Train in any weather</option>
+            <option value="light_ok">Light rain ok storm no</option>
+            <option value="indoor">Indoor only</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Travel Training Style</label>
+          <select value={localProfile.travelTrainingStyle || ''} onChange={e => handleChange('travelTrainingStyle', e.target.value || null)}>
+            <option value="">Not set — ask me when I travel</option>
+            <option value="shadow_hotel">Shadow and bodyweight in hotel</option>
+            <option value="hotel_gym">Finds hotel gym</option>
+            <option value="runs_anywhere">Runs anywhere</option>
+            <option value="write_off">Writes off travel weeks</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Physical commute one-way (min)</label>
+          <input type="number" value={localProfile.physicalCommuteMinutes} onChange={e => handleChange('physicalCommuteMinutes', Number(e.target.value))} />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', gridColumn: '1 / -1' }}>
+          <label className="switch">
+            <input type="checkbox" checked={!!localProfile.mealBufferEnabled} onChange={e => handleChange('mealBufferEnabled', e.target.checked)} id="mealBuffer" />
+            <span className="slider-toggle"></span>
+          </label>
+          <label htmlFor="mealBuffer" style={{ marginBottom: 0, cursor: 'pointer' }}>Enable Meal Buffer (Auto-schedule around meals)</label>
+        </div>
+      </div>
+
+      {/* Weekly Availability */}
+      <div className="card" style={{ marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 className="section-title" style={{ margin: 0 }}>Weekly Availability</h3>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={handleImportAvailability}>
+              <Upload size={14} style={{ marginRight: '4px' }} /> Import
+            </button>
+            <button className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={handleExportAvailability}>
+              <Download size={14} style={{ marginRight: '4px' }} /> Export
+            </button>
+          </div>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+          Tap any time slot to mark it as busy. The AI uses this to avoid scheduling over your commitments.
+        </p>
+        <AvailabilityCalendar
+          availability={availability || {}}
+          setAvailability={setAvailability}
+          availabilityTemplate={availabilityTemplate || {}}
+          setAvailabilityTemplate={setAvailabilityTemplate}
+          schedule={schedule}
+          locations={localProfile.locations || []}
+          profile={localProfile}
+          onConflictDetected={({ day, exerciseName, conflictDetails }) => {
+            // surfaced in UI via cell highlight; no modal needed here
+            console.warn('[AvailabilityCalendar] Conflict:', day, exerciseName, conflictDetails);
+          }}
+        />
       </div>
 
       {/* Goals Section */}

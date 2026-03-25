@@ -17,7 +17,18 @@ const initialProfile = {
   prepTime: 60,
   voiceTriggerWord: 'nota',
   voiceNotesEnabled: true,
-  levels: { cardio: 2, technique: 2, footwork: 2, defense: 2, jab: 2, reading: 2 }
+  levels: { cardio: 2, technique: 2, footwork: 2, defense: 2, jab: 2, reading: 2 },
+  chronotype: 'inconsistent',
+  wakeupRampMinutes: 60,
+  jobLoad: 'variable',
+  sleepConsistency: 'mostly',
+  minSessionMinutes: 20,
+  consecutiveDaysPreference: 'flexible',
+  weatherThreshold: 'light_ok',
+  travelTrainingStyle: null,
+  physicalCommuteMinutes: 0,
+  mealBufferEnabled: false,
+  locations: []
 };
 
 const initialTimerPresets = [
@@ -174,6 +185,8 @@ export function useAppState() {
     apiKey: '', model: 'claude-sonnet-4-20250514', anthropicKey: '', openrouterKey: '', googleKey: '', activeProvider: 'anthropic'
   });
   const [pendingWeekProposal, setPendingWeekProposal] = useIdbStorage('bxng_pending_week_proposal', null);
+  const [availability, setAvailability] = useIdbStorage('bxng_availability', {});
+  const [availabilityTemplate, setAvailabilityTemplate] = useIdbStorage('bxng_availability_template', {});
   const [pendingTools, setPendingTools] = useState(null);
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
 
@@ -213,6 +226,8 @@ export function useAppState() {
     coachSettings, setCoachSettings,
     pendingWeekProposal, setPendingWeekProposal,
     pendingCoachContext, setPendingCoachContext,
-    pendingTools, setPendingTools
+    pendingTools, setPendingTools,
+    availability, setAvailability,
+    availabilityTemplate, setAvailabilityTemplate
   };
 }

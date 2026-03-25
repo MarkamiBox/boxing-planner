@@ -35,9 +35,39 @@ export function formatTime(seconds) {
 /**
  * Calculates the estimated total duration in minutes of an exercise
  */
-export function calculateDuration(workout) {
+export function calculateDuration(workout, locations = [], day = '') {
   if (!workout) return 0;
   
+  // 0. Manual durationMinutes override or Range detection
+  if (workout.durationMinutes) return workout.durationMinutes;
+
+  if (workout.plannedTime && workout.plannedTime.includes('-')) {
+    const parts = workout.plannedTime.split('-');
+    const [h1, m1] = parts[0].split(':').map(Number);
+    const [h2, m2] = parts[1].split(':').map(Number);
+    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diff > 0) return diff;
+  }
+
+  // 1. Dynamic Course Duration from Profile
+  if (workout.isCourse && workout.courseLocationId !== '' && workout.courseIdx !== '' && day) {
+    const loc = locations[workout.courseLocationId];
+    if (loc && Array.isArray(loc.schedule)) {
+      const dayLower = day.toLowerCase();
+      const filtered = loc.schedule.filter(c => c.day?.toLowerCase() === dayLower);
+      const picked = filtered[workout.courseIdx];
+      if (picked && picked.duration) return Number(picked.duration);
+      if (picked && picked.endTime) {
+        const h1 = parseInt(picked.time.split(':')[0]);
+        const m1 = parseInt(picked.time.split(':')[1]);
+        const h2 = parseInt(picked.endTime.split(':')[0]);
+        const m2 = parseInt(picked.endTime.split(':')[1]);
+        const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (diff > 0) return diff;
+      }
+    }
+  }
+
   let stepsDuration = 0;
   if (workout.steps && workout.steps.length > 0) {
     let totalSec = 0;
@@ -64,9 +94,26 @@ export function calculateDuration(workout) {
   let finalDuration = Math.max(stepsDuration, textDuration);
 
   if (finalDuration === 0) {
-    const isCourse = /(corso|class|lezione)/.test(textToSearch);
-    if (isCourse) finalDuration = 60;
+    if (workout.isCourse) finalDuration = 60;
   }
 
   return finalDuration;
+}
+
+/**
+ * Adds minutes to a "HH:MM" string and returns a "HH:MM" string
+ */
+export function addMinutesToTime(hhmm, mins) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = h * 60 + m + mins;
+  const newH = Math.floor(total / 60) % 24;
+  const newM = total % 60;
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+}
+export function timeToMinutes(hhmm) {
+  if (!hhmm) return 0;
+  if (!hhmm.includes(':')) return 0;
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
 }

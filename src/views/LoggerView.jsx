@@ -18,7 +18,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     const d = new Date();
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   });
-  const [durationStr, setDurationStr] = useState(activeWorkout ? String(calculateDuration(activeWorkout)) : '');
+  const [durationStr, setDurationStr] = useState(activeWorkout ? String(calculateDuration(activeWorkout, profile?.locations || [], activeWorkout.sourceDay || '')) : '');
 
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);
@@ -65,7 +65,7 @@ export function LoggerView({ logs, setLogs, activeWorkout, setActiveWorkout, sch
     if (activeWorkout) {
       setType(activeWorkout.type);
       setNotes(`Completed: ${activeWorkout.name}`);
-      setDurationStr(String(calculateDuration(activeWorkout)));
+      setDurationStr(String(calculateDuration(activeWorkout, profile?.locations || [], activeWorkout.sourceDay || '')));
     }
   }, [activeWorkout]);
 

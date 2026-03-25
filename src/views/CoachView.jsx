@@ -70,7 +70,9 @@ export function CoachView({
   coachConversations, setCoachConversations,
   pendingCoachContext, setPendingCoachContext,
   pendingTools, setPendingTools,
-  pendingWeekProposal, setPendingWeekProposal
+  pendingWeekProposal, setPendingWeekProposal,
+  availability,
+  availabilityTemplate,
 }) {
   const { showConfirm } = useDialog();
   const [inputText, setInputText] = useState('');
@@ -220,7 +222,7 @@ export function CoachView({
     setIsLoading(true);
     try {
       const apiMessages = updatedMessages.filter(m => m.role === 'user' || m.role === 'assistant');
-      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessages });
+      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessages, availability, availabilityTemplate, locations: profile.locations });
 
       let accText = '';
       const result = await sendCoachMessage({
@@ -328,7 +330,7 @@ export function CoachView({
     updateConversation(updatedWithResult);
 
     try {
-      const systemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory, weeks, messages: updatedWithResult });
+      const systemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory, weeks, messages: updatedWithResult, availability, availabilityTemplate, locations: profile.locations });
       let accText = '';
       const followUp = await sendToolResults({
         apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt,

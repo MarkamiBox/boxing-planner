@@ -1,25 +1,14 @@
 import React, { useState } from 'react';
 import { X, StickyNote } from 'lucide-react';
 import { BodyDummy } from './BodyDummy';
+import { calculateDuration } from '../utils';
 
 export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
   const recentLogWithWeight = logs?.find(l => l.bodyWeight);
   const recentLogWithSleep = logs?.find(l => l.sleepHours || l.sleepQuality);
 
-  const calculateDuration = () => {
-    if (!exercise || !exercise.steps) return '';
-    let totalSec = 0;
-    exercise.steps.forEach(s => {
-      let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
-      if(s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
-      else if(s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
-      else if(s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
-      else if(s.type === 'text') totalSec += Number(s.duration || 0) + prep;
-    });
-    return totalSec > 0 ? String(Math.round(totalSec / 60)) : '';
-  };
-
-  const [durationStr, setDurationStr] = useState(calculateDuration());
+  const durMinutes = calculateDuration(exercise, [], ''); // Default context
+  const [durationStr, setDurationStr] = useState(durMinutes > 0 ? String(durMinutes) : '');
 
   const [energy, setEnergy] = useState(7);
   const [cardio, setCardio] = useState(7);

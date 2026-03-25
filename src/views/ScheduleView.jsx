@@ -2,13 +2,13 @@ import React, { useState, useRef } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
-import { getTodayDayName, getWeekId, calculateDuration } from '../utils';
+import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime } from '../utils';
 import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
+export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
   const todayDay = getTodayDayName();
   const isCurrentWeek = currentWeekId === getWeekId();
@@ -18,11 +18,11 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   const [copyPickerFor, setCopyPickerFor] = useState(null); // exerciseId being copied
   const [quickLogTarget, setQuickLogTarget] = useState(null); // { exercise, logId, day }
 
-  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [] });
+  const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseIdx: '' });
   const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
 
   // JSON Import state
-  const [jsonImport, setJsonImport] = useState({ open: false, text: '', error: '' });
+  const [jsonImport, setJsonImport] = useState({ open: false, mode: 'day', text: '', error: '' });
 
   // Swipe gesture tracking
   const swipeStartX = useRef(null);
@@ -111,7 +111,10 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       type: exercise.type,
       notes: exercise.notes || '',
       plannedTime: exercise.plannedTime || '',
-      steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) })) : []
+      steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) })) : [],
+      isCourse: exercise.isCourse || false,
+      courseLocationId: exercise.courseLocationId || '',
+      courseIdx: exercise.courseIdx || ''
     });
   };
 
@@ -195,8 +198,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
   };
 
   // ── JSON Import ──────────────────────────────────────────────────────────────
-  const openJsonImport = () => setJsonImport({ open: true, text: '', error: '' });
-  const closeJsonImport = () => setJsonImport({ open: false, text: '', error: '' });
+  const closeJsonImport = () => setJsonImport({ open: false, mode: 'day', text: '', error: '' });
 
   const importExercisesFromJSON = () => {
     let parsed;
@@ -204,6 +206,20 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
       parsed = JSON.parse(jsonImport.text);
     } catch {
       setJsonImport(s => ({ ...s, error: 'JSON non valido. Controlla la sintassi.' }));
+      return;
+    }
+
+    if (jsonImport.mode === 'week') {
+      // Validate week structure
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        setJsonImport(s => ({ ...s, error: 'Per l\'import settimanale serve un oggetto con i giorni (monday, tuesday...).' }));
+        return;
+      }
+      const newWeeks = { ...weeks, [currentWeekId]: parsed };
+      setWeeks(newWeeks);
+      setSchedule(parsed);
+      closeJsonImport();
+      showAlert('Successo', 'Settimana importata correttamente!');
       return;
     }
 
@@ -440,6 +456,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
               {cloneMenuOpen && (
                 <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.25rem', zIndex: 100, minWidth: '160px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', marginTop: '4px' }}>
                   <button onClick={handleCloneLastWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><Copy size={14} style={{ marginRight: '6px' }} /> Clone last week</button>
+                  <button onClick={() => { setJsonImport({ open: true, mode: 'week', text: '', error: '' }); setCloneMenuOpen(false); }} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--text-main)', fontSize: '0.85rem' }}><FileCode2 size={14} style={{ marginRight: '6px' }} /> Import Week JSON</button>
                   <button onClick={handleClearWeek} className="btn-text" style={{ display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '0.4rem 0.6rem', color: 'var(--primary)', fontSize: '0.85rem' }}><Trash2 size={14} style={{ marginRight: '6px' }} /> Start blank</button>
                 </div>
               )}
@@ -479,7 +496,7 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
             {getDayTotalDuration() && <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '2px' }}>{getDayTotalDuration()}</div>}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="btn-icon import-json-btn" title="Import exercises from JSON" onClick={openJsonImport}>
+            <button className="btn-icon import-json-btn" title="Import exercises from JSON" onClick={() => setJsonImport({ open: true, mode: 'day', text: '', error: '' })}>
               <FileCode2 size={18} />
             </button>
             <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
@@ -511,22 +528,92 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                       <option value="Running">Running</option>
                       <option value="Recovery">Recovery</option>
                     </select>
-                    <input
-                      type="time"
-                      value={editForm.plannedTime || ''}
-                      onChange={e => setEditForm({ ...editForm, plannedTime: e.target.value })}
-                      style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', minWidth: '80px' }}
-                    />
+                    {editForm.isCourse && editForm.courseIdx !== '' ? (
+                      <div style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', background: 'rgba(185, 28, 28, 0.1)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', minWidth: '80px' }}>
+                        🕒 {editForm.plannedTime}
+                      </div>
+                    ) : (
+                      <input
+                        type="time"
+                        value={editForm.plannedTime || ''}
+                        onChange={e => setEditForm({ ...editForm, plannedTime: e.target.value })}
+                        style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', minWidth: '80px' }}
+                      />
+                    )}
                   </div>
-                  <textarea
-                    value={editForm.notes}
-                    onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                    placeholder="General Notes"
-                    rows="2"
-                    style={{ marginBottom: '1rem' }}
-                  />
+                    <textarea
+                      value={editForm.notes}
+                      onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                      placeholder="General Notes"
+                      rows="2"
+                    />
 
-                  {/* Guided Steps Builder */}
+                    <div className="editor-row" style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <label className="toggle-group" style={{ flexShrink: 0 }}>
+                        <div className="switch">
+                          <input
+                            type="checkbox"
+                            checked={editForm.isCourse}
+                            onChange={e => setEditForm(prev => ({ ...prev, isCourse: e.target.checked }))}
+                          />
+                          <span className="slider"></span>
+                        </div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>È un Corso</span>
+                      </label>
+                      
+                      {editForm.isCourse && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <select
+                            value={editForm.courseLocationId}
+                            onChange={e => setEditForm(prev => ({ ...prev, courseLocationId: e.target.value, courseIdx: '' }))}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', height: '42px' }}
+                          >
+                            <option value="">Seleziona Luogo...</option>
+                            {(profile?.locations || []).map((loc, idx) => (
+                              <option key={idx} value={idx}>{loc.name || `Luogo ${idx + 1}`}</option>
+                            ))}
+                          </select>
+
+                          {editForm.courseLocationId !== '' && (
+                            <select
+                              value={editForm.courseIdx}
+                              onChange={e => {
+                                const idx = e.target.value;
+                                if (idx === '') return;
+                                const loc = profile.locations[editForm.courseLocationId];
+                                const courses = Array.isArray(loc.schedule) ? loc.schedule : [];
+                                const filtered = courses.filter(c => c.day?.toLowerCase() === activeDay.toLowerCase());
+                                const picked = filtered[idx];
+                                if (picked) {
+                                  setEditForm(prev => ({
+                                    ...prev,
+                                    courseIdx: idx,
+                                    name: picked.course || prev.name,
+                                    plannedTime: picked.time || prev.plannedTime,
+                                    // If the course has a specific duration field, we could use it here
+                                    // For now we'll store the index to help the duration calculator
+                                  }));
+                                }
+                              }}
+                              style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--surface)', color: 'var(--text-main)', height: '42px' }}
+                            >
+                              <option value="">Scegli Corso...</option>
+                              {(() => {
+                                const loc = profile.locations[editForm.courseLocationId];
+                                const courses = Array.isArray(loc.schedule) ? loc.schedule : [];
+                                return courses
+                                  .filter(c => c.day?.toLowerCase() === activeDay.toLowerCase())
+                                  .map((c, i) => (
+                                    <option key={i} value={i}>{c.time} - {c.course}</option>
+                                  ));
+                              })()}
+                            </select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Guided Steps Builder */}
                   <div className="steps-builder">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>Guided Steps Playlist</label>
@@ -563,8 +650,20 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
                     <div className="ex-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span className={`tag ${ex.type.toLowerCase()}`}>{ex.type}</span>
                       <h3 style={{ margin: 0 }}>{ex.name}</h3>
-                      {calculateDuration(ex) > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>~{calculateDuration(ex)} min</span>}
-                      {ex.plannedTime && <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(185, 28, 28, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>🕒 {ex.plannedTime}</span>}
+                      {(() => { 
+                        const dur = calculateDuration(ex, profile?.locations || [], activeDay);
+                        return dur > 0 ? <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>~{dur} min</span> : null;
+                      })()}
+                      {ex.plannedTime && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(185, 28, 28, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                          🕒 {(() => {
+                            if (ex.plannedTime.includes('-')) return ex.plannedTime;
+                            const duration = calculateDuration(ex, profile?.locations || [], activeDay);
+                            const endTime = addMinutesToTime(ex.plannedTime, duration);
+                            return `${ex.plannedTime}${endTime ? '-' + endTime : ''}`;
+                          })()}
+                        </span>
+                      )}
                     </div>
                     {ex.notes && <p className="ex-notes" style={{ whiteSpace: 'pre-line' }}>{ex.notes}</p>}
 
@@ -658,13 +757,13 @@ export function ScheduleView({ schedule, setSchedule, weeks, setWeeks, currentWe
           <div className="json-modal" onClick={e => e.stopPropagation()}>
             <div className="json-modal-header">
               <h3><FileCode2 size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Import JSON → <span style={{ color: 'var(--primary)' }}>{activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}</span>
+                {jsonImport.mode === 'week' ? `Import Full Week → ${currentWeekId}` : `Import Day → ${activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}`}
               </h3>
               <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={closeJsonImport}><X size={18} /></button>
             </div>
 
             <p className="json-modal-hint">
-              Incolla un array di esercizi (o un singolo oggetto). Campi supportati:
+              {jsonImport.mode === 'week' ? 'Incolla un oggetto JSON con i giorni (monday, tuesday, wednesday, thursday, friday, saturday, sunday).' : 'Incolla un array di esercizi (o un singolo oggetto). Campi supportati:'}
             </p>
 
             <pre className="json-schema-example">{`[

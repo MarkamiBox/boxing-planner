@@ -2,6 +2,8 @@
  * Coach API Service — Version 2
 */
 
+import { compressAvailability, detectSkipPatterns } from '../components/AvailabilityCalendar';
+
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -89,6 +91,11 @@ export function detectIntent(messages, { schedule, logs, weeks, currentWeekId })
   if (/(?:migliorat|progress|crescit|nell.ultimo (?:mese|period)|ultim[ei] \d+ settiman)/.test(text))
     return 'ANALYZE_PROGRESS';
 
+  if (
+    (/(?:orario|distribu|carico settimana|ha senso|perch[eé] hai messo|posso allenarmi)/.test(text)) ||
+    (/(?:tempo|impegno)/.test(text) && /(?:luned|marted|mercoled|gioved|venerd|sabat|domenic)/.test(text))
+  ) return 'ANALYZE_SCHEDULE';
+
   // ── SOFT INTENTS ──
   if (/(?:sto per iniziare|sto per allenar|prima dell.allenam|ho appena finit|appena uscit|come mi regolo|domani alleno)/.test(text))
     return 'REAL_TIME';
@@ -174,7 +181,7 @@ function detectBodyMapPatterns(logs) {
   return `BODY MAP PATTERNS:\n${lines.join('\n')}`;
 }
 
-function buildAthleteSnapshot(profile, logs) {
+function buildAthleteSnapshot(profile, logs, availability, locations, weeks, currentWeekId) {
   const recent = (logs || []).filter(l => l.energy > 0).slice(0, 7);
   const last = recent[0];
   const avg = (key) => recent.length > 0
@@ -224,7 +231,15 @@ ${consecutiveLowEnergy ? '🚨 3+ sessions energy ≤5 — DELOAD REQUIRED\n' : 
 Locations:
 ${profile.locations?.length > 0
       ? profile.locations.map(l => `  ${l.name}: ${l.equipment}${l.schedule ? ' [FIXED COURSES — do not modify UNLESS deload/injury]' : ''}`).join('\n')
-      : '  No locations — ask athlete before programming equipment work'}`;
+      : '  No locations — ask athlete before programming equipment work'}
+${profile.chronotype ? `
+Scheduling Context:
+  Chronotype: ${profile.chronotype}, functional after ${profile.wakeupRampMinutes || 60}min, job load: ${profile.jobLoad || 'unknown'}, physical commute: ${profile.physicalCommuteMinutes || 0}min` : ''}
+${availability && Object.keys(availability).length > 0 ? `  Availability this week: ${compressAvailability(availability, locations || profile.locations || [], profile)}` : ''}
+${(() => {
+      const patterns = detectSkipPatterns(logs, weeks, currentWeekId);
+      return patterns.length > 0 ? `  Skip patterns: ${patterns.join(', ')}` : '';
+    })()}`;
 }
 
 // ── Part 4 — Week & Logs ──────────────────────────────────────────────────────
@@ -642,7 +657,7 @@ function parsePeriodizationEntry(text) {
   };
 }
 
-export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages }) {
+export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages, availability, availabilityTemplate, locations }) {
   const today = new Date().toLocaleDateString('it-IT', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
@@ -668,7 +683,7 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
     buildCoreIdentity(profile),
     `TODAY: ${today} | DETECTED INTENT: ${intent}
 NOTE: If this intent doesn't match what the athlete actually asked, ignore the label and respond to their real question.`,
-    buildAthleteSnapshot(profile, logs),
+    buildAthleteSnapshot(profile, logs, availability, locations || profile.locations || [], weeks, currentWeekId),
     buildCurrentWeek(schedule, currentWeekId),
     buildRecentLogs(logs),
     `═══ GOALS ═══\n${goalsText}`,
@@ -686,6 +701,18 @@ NOTE: If this intent doesn't match what the athlete actually asked, ignore the l
     intent === 'TECHNIQUE' ? buildTechniqueModule(profile) : '',
     intent === 'TRAVEL_WEEK' ? buildTravelModule(profile) : '',
     intent === 'REAL_TIME' ? buildRealTimeModule(schedule, logs) : '',
+
+    ['PLAN_WEEK', 'MODIFY_SESSION', 'TRAVEL_WEEK'].includes(intent) ? `═══ SCHEDULING PRINCIPLES ═══
+1. BUFFERS FIRST: Calculate backwards from every hard commitment. Sweat session = 20min shower + (travelMinutes × 2) + 15min buffer. If session doesn't fit mathematically, use home alternative or rest. Never schedule a session that cannot complete with all buffers intact.
+2. ENERGY MATCHING: Fresh window = any session type valid. Post-work drained = technical or mobility only, never conditioning or sparring. After 20:00 or before chronotype peak window = no high CNS demand. Family commitments = buffer both sides, athlete must arrive mentally fresh not physically tired.
+3. WINDOW FITTING: Under 20min = micro only (neck protocol, visualization, grip work, light rope technique). 20-45min = home or shadow only. 45-75min = single focus one location. 75min+ = full structured session. When 10-20min short: compress rest max 15 seconds, remove warm-up if athlete traveled to location, move cool-down to home with a note. Never compress main work block below 20min.
+4. SHIFT BEFORE COMPRESS: Prime window tomorrow always beats compressed window today. Shifting preferred over compressing. Three or more compressed sessions this week = next prime window is recovery regardless of periodization plan. Tell athlete explicitly when you shift something and why.
+5. FIXED ANCHORS AND PATTERNS: Fixed class times with fixedClassTimes field are sacred, never move or schedule conflicts in adjacent slots that affect travel time. Recurring skip pattern on specific day/time slot = treat as soft-unavailable, do not force sessions there, mention pattern to athlete. A completed 20min session beats a skipped 75min session.
+6. CONTEXT OVERRIDES: Competition goal under 8 weeks = protect rest windows even if technically free, taper logic takes precedence. Travel week = check travelTrainingStyle before planning, if null ask athlete first. Meal conflict within 90min of likely meal time = flag in session notes only, do not block. Weather likely poor for outdoor session = always prepare indoor alternative in session notes. Soft commitments can be flagged for rescheduling if they conflict with critical windows. Hard commitments are sacred.
+7. COURSES AND FIXED CLASSES: If a session is a fixed gym class, ALWAYS set 'isCourse: true' in the exercise object. You MUST select the specific course by setting 'courseIdx'. IMPORTANT: You CANNOT change the 'plannedTime' of a course; it must strictly match the time defined in the profile's course schedule. Courses are anchors and cannot be rescheduled.` : '',
+
+    intent === 'ANALYZE_SCHEDULE' ? `═══ SCHEDULE ANALYSIS CONTEXT ═══
+Review the current week schedule against the athlete's availability. Check and comment on: hard commitment buffer violations (session ends too close to commitment), session type mismatches with energy state of that window, fixed anchor conflicts, overloaded consecutive days given athlete's consecutiveDaysPreference. Explain your reasoning clearly for each issue found. Do not rebuild or modify the week unless explicitly asked to do so.` : '',
 
     ['DIAGNOSE', 'COACH_CHAT'].includes(intent) ? buildDiagnoseModule(logs, messages) : '',
 
@@ -711,7 +738,7 @@ Data suggests athlete may have reached a goal. Bring it up. Ask if they want to 
 4. NEVER program equipment the athlete doesn't have.
 5. Frustration → acknowledge 1 sentence, then data + fixes.
 6. Every session MUST have structured steps for the guided timer.
-7. Step durations in seconds. Exercise IDs: Date.now() as string.
+7. Step durations in seconds. Exercise IDs: Date.now() as string. For any gym/fixed class, include 'isCourse: true' and 'courseLocationId: [index]' in the exercise object.
 8. Body map alerts → immediate load reduction ONLY on affected areas if risk >= 8.
 9. TOOLS AVAILABLE: create_next_week, add_exercise, remove_exercise, reschedule_exercise, modify_session, update_coach_memory, update_goals, update_skill_level.
 10. PAIN, SORENESS & BODY MAP SCALE:
