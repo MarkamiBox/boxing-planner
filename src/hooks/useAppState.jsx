@@ -222,19 +222,21 @@ export function useAppState() {
 
   useEffect(() => {
     const todayWeekId = getWeekId();
+    
+    // Initial data setup for new users
     if (!weeks) {
       setWeeks({ [todayWeekId]: initialSchedule });
       setCurrentWeekId(todayWeekId);
     } else if (!currentWeekId) {
+      // Fallback if currentWeekId is missing but weeks exist
       setCurrentWeekId(todayWeekId);
     }
+
+    // Update app version tracking without wiping user data
     if (appVersion !== APP_VERSION) {
-      setWeeks({ [todayWeekId]: initialSchedule });
-      setCurrentWeekId(todayWeekId);
-      resetTimerPresets();
       setAppVersion(APP_VERSION);
     }
-  }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, resetTimerPresets, setAppVersion]);
+  }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, setAppVersion]);
 
   const schedule = weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;
   const setSchedule = (newSchedule) => {

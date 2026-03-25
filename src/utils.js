@@ -110,16 +110,27 @@ export function calculateDuration(workout, locations = [], day = '') {
  * Adds minutes to a "HH:MM" string and returns a "HH:MM" string
  */
 export function addMinutesToTime(hhmm, mins) {
-  if (!hhmm) return '';
-  const [h, m] = hhmm.split(':').map(Number);
+  if (!hhmm || typeof hhmm !== 'string') return '';
+  const match = hhmm.trim().match(/^(\d{1,2})\s*:\s*(\d{1,2})/);
+  if (!match) return hhmm; // Fallback to original string if not parsable
+
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (isNaN(h) || isNaN(m)) return hhmm;
+
   const total = h * 60 + m + mins;
-  const newH = Math.floor(total / 60) % 24;
-  const newM = total % 60;
+  const newH = Math.floor(Math.max(0, total) / 60) % 24;
+  const newM = Math.max(0, total) % 60;
   return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
 }
 export function timeToMinutes(hhmm) {
-  if (!hhmm) return 0;
-  if (!hhmm.includes(':')) return 0;
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
+  if (!hhmm || typeof hhmm !== 'string') return 0;
+  const match = hhmm.trim().match(/^(\d{1,2})\s*:\s*(\d{1,2})/);
+  if (!match) {
+    const hoursOnly = parseInt(hhmm, 10);
+    return isNaN(hoursOnly) ? 0 : hoursOnly * 60;
+  }
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  return (isNaN(h) || isNaN(m)) ? 0 : h * 60 + m;
 }

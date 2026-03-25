@@ -8,6 +8,10 @@ import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
 
 export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs }) {
   const { showAlert, showConfirm } = useDialog();
@@ -102,18 +106,20 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       const sessionOriginId = `${currentWeekId}-${day}-${exerciseId}`;
 
       if (ex.done) {
-        const logId = Date.now().toString();
+        const logId = generateId();
+        const exerciseSnapshot = JSON.parse(JSON.stringify(ex));
         const placeholderLog = {
+          ...exerciseSnapshot,
           id: logId,
           originId: sessionOriginId,
           date: new Date().toISOString().split('T')[0],
           weekId: currentWeekId,
-          type: ex.type,
-          name: ex.name,
           energy: 0,
           cardio: 0,
           legs: 0,
-          notes: 'Sessione veloce dallo Schedule'
+          intensity: 0,
+          focus: 0,
+          notes: exerciseSnapshot.notes || 'Sessione veloce dallo Schedule'
         };
         setLogs(prev => [placeholderLog, ...prev]);
         setQuickLogTarget({ exercise: ex, logId, day });
@@ -131,7 +137,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       type: exercise.type,
       notes: exercise.notes || '',
       plannedTime: exercise.plannedTime || '',
-      steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || Math.random().toString(36).substr(2, 9) })) : [],
+      steps: exercise.steps ? exercise.steps.map(s => ({ ...s, id: s.id || generateId() })) : [],
       isCourse: exercise.isCourse || false,
       courseLocationId: exercise.courseLocationId || '',
       courseId: exercise.courseId || '',
@@ -192,7 +198,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const copyExerciseTo = (ex, targetDay) => {
     const newSchedule = { ...schedule };
     const cloned = JSON.parse(JSON.stringify(ex));
-    cloned.id = Date.now().toString();
+    cloned.id = generateId();
     cloned.done = false;
     newSchedule[targetDay] = [...(newSchedule[targetDay] || []), cloned];
     setSchedule(newSchedule);
@@ -201,7 +207,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   const addExercise = (day) => {
     const newSchedule = { ...schedule };
-    const newId = Date.now().toString();
+    const newId = generateId();
     newSchedule[day].push({
       id: newId,
       type: 'Boxing',
@@ -271,7 +277,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
       s.steps = s.steps.map((step, idx) => {
         const ss = {
-          id: step.id || Math.random().toString(36).substr(2, 9),
+          id: step.id || generateId(),
           type: ['timer', 'manual_timer', 'interval', 'sets', 'text'].includes(step.type) ? step.type : 'timer',
           name: step.name || `Step ${idx + 1}`,
           instruction: step.instruction || ''
@@ -308,7 +314,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       const sanitizedWeek = {};
       daysOfWeek.forEach(day => {
         const dayExercises = Array.isArray(parsed[day]) ? parsed[day] : [];
-        sanitizedWeek[day] = dayExercises.map((ex, i) => sanitizeExercise(ex, `import-w-${day}-${i}-${Date.now()}`));
+        sanitizedWeek[day] = dayExercises.map((ex, i) => sanitizeExercise(ex, `import-w-${day}-${i}-${generateId()}`));
       });
 
       const newWeeks = { ...weeks, [currentWeekId]: sanitizedWeek };
@@ -321,8 +327,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
     // Day mode: Accept both a single object or an array
     const rawExercises = Array.isArray(parsed) ? parsed : [parsed];
-    const now = Date.now();
-    const normalised = rawExercises.map((e, i) => sanitizeExercise(e, `import-d-${now}-${i}`));
+    const normalised = rawExercises.map((e, i) => sanitizeExercise(e, `import-d-${generateId()}-${i}`));
 
     const newSchedule = { ...schedule };
     newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
@@ -347,7 +352,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   // --- Step Builder Core ---
   const addStep = () => {
-    const newStep = { id: Date.now().toString(), type: 'timer', name: 'New Step', duration: 180, instruction: '' };
+    const newStep = { id: generateId(), type: 'timer', name: 'New Step', duration: 180, instruction: '' };
     setEditForm({ ...editForm, steps: [...editForm.steps, newStep] });
   };
 

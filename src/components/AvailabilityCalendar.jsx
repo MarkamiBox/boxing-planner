@@ -15,11 +15,29 @@ const REASON_LABELS = { work: 'Work', social: 'Social', travel: 'Travel', rest: 
 const ENERGY_OPTIONS = ['drained', 'neutral', 'fresh'];
 
 function slotIndexFromTime(hhmm) {
-  if (!hhmm) return 0;
-  // If hhmm is a range (e.g. 15:15-16:15), only use the start time
-  const startTimePart = hhmm.split('-')[0];
-  const [h, m] = startTimePart.split(':').map(Number);
-  return ((h - START_HOUR) * 60 + m) / SLOT_MINS;
+  if (!hhmm || typeof hhmm !== 'string') return 0;
+
+  // Extract start time segment (handle ranges like "09:00-10:00")
+  const timePart = hhmm.split('-')[0].trim();
+
+  // Regex to extract hours and minutes safely (e.g. "09:00", "9 : 30")
+  const match = timePart.match(/^(\d{1,2})\s*:\s*(\d{1,2})/);
+
+  let h, m;
+  if (match) {
+    h = parseInt(match[1], 10);
+    m = parseInt(match[2], 10);
+  } else {
+    // Fallback for single numbers or malformed strings with numbers
+    h = parseInt(timePart, 10);
+    m = 0;
+  }
+
+  if (isNaN(h) || isNaN(m)) return 0;
+
+  // Calculate grid row index relative to START_HOUR
+  const idx = ((h - START_HOUR) * 60 + m) / SLOT_MINS;
+  return isNaN(idx) ? 0 : idx;
 }
 
 function slotIndexToLabel(idx) {
