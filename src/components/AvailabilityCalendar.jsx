@@ -435,6 +435,7 @@ export function AvailabilityCalendar({
   };
 
   const handleDragStart = (e, day, slot) => {
+    if (e.pointerId !== undefined) e.target.setPointerCapture(e.pointerId);
     e.stopPropagation();
     const startIdx = slotIndexFromTime(slot.start);
     const endIdx = slotIndexFromTime(slot.end);
@@ -447,7 +448,8 @@ export function AvailabilityCalendar({
     }
   };
 
-  const finalizeMove = () => {
+  const finalizeMove = (e) => {
+    if (e && e.cancelable) e.preventDefault();
     if (dragging && dragOver) {
       const { day: newDay, rowIndex: newRowIndex } = dragOver;
       const { day: oldDay, slot, span } = dragging;
@@ -498,8 +500,10 @@ export function AvailabilityCalendar({
     setCreatingDrag(null);
   };
 
-  const getCellFromTouch = (touch) => {
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const getCellFromEvent = (e) => {
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+    const el = document.elementFromPoint(clientX, clientY);
     const cell = el?.closest('.av-cell');
     if (!cell) return null;
     const day = cell.getAttribute('data-day');
@@ -508,6 +512,7 @@ export function AvailabilityCalendar({
   };
 
   const handleTouchStart = (e, day, rowIndex, slot = null) => {
+    if (e.cancelable) e.preventDefault();
     if (slot) {
       const startIdx = slotIndexFromTime(slot.start);
       const endIdx = slotIndexFromTime(slot.end);
@@ -517,12 +522,11 @@ export function AvailabilityCalendar({
     }
   };
 
-  const handleTouchMove = (e) => {
+  const handleMove = (e) => {
     if (!dragging && !creatingDrag) return;
     if (e.cancelable) e.preventDefault();
 
-    const touch = e.touches[0];
-    const cell = getCellFromTouch(touch);
+    const cell = getCellFromEvent(e);
     if (!cell) return;
 
     if (dragging) {
@@ -611,11 +615,12 @@ export function AvailabilityCalendar({
           onClick={(e) => {
             if (!creatingDrag && !dragging) handleCellClick(day, rowIndex, e);
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             if (e.button !== 0) return;
+            // No capture for creation so onPointerEnter works on other cells
             setCreatingDrag({ day, startRowIndex: rowIndex, endRowIndex: rowIndex });
           }}
-          onMouseEnter={() => {
+          onPointerEnter={() => {
             if (creatingDrag && creatingDrag.day === day) {
               setCreatingDrag(prev => ({ ...prev, endRowIndex: rowIndex }));
             }
@@ -691,7 +696,7 @@ export function AvailabilityCalendar({
                       zIndex: 20,
                       ...customStyle
                     }}
-                    onMouseDown={(e) => handleDragStart(e, day, it)}
+                    onPointerDown={(e) => handleDragStart(e, day, it)}
                     onTouchStart={(e) => {
                       e.stopPropagation();
                       handleTouchStart(e, day, rowIndex, it);
@@ -711,9 +716,10 @@ export function AvailabilityCalendar({
     <div>
       <div 
         className="av-cal-wrapper" 
-        onMouseUp={finalizeMove} 
-        onMouseLeave={() => { setDragging(null); setDragOver(null); setCreatingDrag(null); }}
-        onTouchMove={handleTouchMove}
+        onPointerUp={finalizeMove} 
+        onPointerLeave={() => { setDragging(null); setDragOver(null); setCreatingDrag(null); }}
+        onPointerMove={handleMove}
+        onTouchMove={handleMove}
         onTouchEnd={finalizeMove}
       >
         <div

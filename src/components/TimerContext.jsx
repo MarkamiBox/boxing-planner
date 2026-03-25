@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { get, set, del } from 'idb-keyval';
 import { useDialog } from './DialogContext';
 
 const TimerContext = createContext(null);
@@ -38,6 +39,7 @@ export const playBeep = (type = 'short', noSound = false) => {
 
 export function TimerProvider({ children, activeWorkout, setActiveWorkout, setActiveTab, globalPrepTime = 60, profile, addSessionNote }) {
   const { showConfirm } = useDialog();
+  const [isReady, setIsReady] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Manual Timer Settings 
@@ -75,40 +77,50 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
 
   // Restore state on mount
   useEffect(() => {
-    try {
-      const savedState = window.localStorage.getItem('bxng_timer_state');
-      if (savedState) {
-        const parsed = JSON.parse(savedState);
-        setPhase(parsed.phase);
-        setCurrentRound(parsed.currentRound);
-        setCurrentStepIdx(parsed.currentStepIdx || 0);
-        setTimeLeft(parsed.timeLeft);
-        if (parsed.expectedEndTime) {
-          timerRef.current.expectedEndTime = parsed.expectedEndTime;
+    async function restore() {
+      try {
+        const savedState = await get('bxng_timer_state');
+        if (savedState) {
+          setPhase(savedState.phase);
+          setCurrentRound(savedState.currentRound);
+          setCurrentStepIdx(savedState.currentStepIdx || 0);
+          setTimeLeft(savedState.timeLeft);
+          if (savedState.expectedEndTime) {
+            timerRef.current.expectedEndTime = savedState.expectedEndTime;
+          }
+          if (savedState.statsTracker) statsTracker.current = savedState.statsTracker;
+          if (savedState.plannedDuration) plannedDuration.current = savedState.plannedDuration;
+          if (savedState.isRunning && savedState.expectedEndTime) {
+            setIsRunning(true);
+          }
         }
-        if (parsed.statsTracker) statsTracker.current = parsed.statsTracker;
-        if (parsed.plannedDuration) plannedDuration.current = parsed.plannedDuration;
-        if (parsed.isRunning && parsed.expectedEndTime) {
-          setIsRunning(true);
-        }
+      } catch (e) {
+        console.error("Timer state restoration error:", e);
+      } finally {
+        setIsReady(true);
       }
-    } catch (e) { }
+    }
+    restore();
   }, []);
 
   // Save state continuously
   useEffect(() => {
-    if (phase !== 'stopped' || isRunning || (isGuided && currentStepIdx > 0)) {
-      const stateToSave = {
-        phase, isRunning, currentRound, currentStepIdx, timeLeft,
-        expectedEndTime: timerRef.current?.expectedEndTime || null,
-        statsTracker: statsTracker.current,
-        plannedDuration: plannedDuration.current
-      };
-      window.localStorage.setItem('bxng_timer_state', JSON.stringify(stateToSave));
-    } else {
-      window.localStorage.removeItem('bxng_timer_state');
-    }
-  }, [phase, isRunning, currentRound, currentStepIdx, timeLeft, isGuided]);
+    if (!isReady) return;
+    const save = async () => {
+      if (phase !== 'stopped' || isRunning || (isGuided && currentStepIdx > 0)) {
+        const stateToSave = {
+          phase, isRunning, currentRound, currentStepIdx, timeLeft,
+          expectedEndTime: timerRef.current?.expectedEndTime || null,
+          statsTracker: statsTracker.current,
+          plannedDuration: plannedDuration.current
+        };
+        await set('bxng_timer_state', stateToSave);
+      } else {
+        await del('bxng_timer_state');
+      }
+    };
+    save();
+  }, [phase, isRunning, currentRound, currentStepIdx, timeLeft, isGuided, isReady]);
 
   const lastWorkoutRef = useRef(null);
 
@@ -138,7 +150,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
 
   // Robust background-proof timer execution
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && isReady) {
       if (!timerRef.current.expectedEndTime) {
         timerRef.current.expectedEndTime = Date.now() + (timeLeft * 1000);
       }
@@ -176,7 +188,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       delete timerRef.current.beeped2;
       delete timerRef.current.beeped3;
     };
-  }, [isRunning, phase, currentRound, isGuided, currentStepIdx, timeLeft, soundEnabled]);
+  }, [isRunning, isReady, phase, currentRound, isGuided, currentStepIdx, timeLeft, soundEnabled]);
 
 
 
@@ -185,7 +197,9 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     delete timerRef.current.expectedEndTime;
 
     if (isGuided) {
-      handleGuidedTransition();
+      if (isReady && activeWorkout) {
+        handleGuidedTransition();
+      }
     } else {
       handleManualTransition();
     }

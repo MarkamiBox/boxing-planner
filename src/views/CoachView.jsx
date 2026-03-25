@@ -266,13 +266,26 @@ export function CoachView({
   const handleApproveProposal = () => {
     setIsLoading(true);
     try {
-      const appState = {
-        schedule, setSchedule,
-        goals, setGoals,
-        coachMemory, setCoachMemory,
-        weeks, setWeeks, currentWeekId, setCurrentWeekId, profile, setProfile
-      };
+      let currentSchedule = schedule;
+      let currentGoals = goals;
+      let currentMemory = coachMemory;
+      let currentWeeks = weeks;
+      let currentProfile = profile;
+
       pendingWeekProposal.toolCalls.forEach(tc => {
+        const appState = {
+          schedule: currentSchedule, 
+          setSchedule: s => { currentSchedule = (typeof s === 'function' ? s(currentSchedule) : s); setSchedule(currentSchedule); },
+          goals: currentGoals, 
+          setGoals: g => { currentGoals = (typeof g === 'function' ? g(currentGoals) : g); setGoals(currentGoals); },
+          coachMemory: currentMemory, 
+          setCoachMemory: m => { currentMemory = (typeof m === 'function' ? m(currentMemory) : m); setCoachMemory(currentMemory); },
+          weeks: currentWeeks, 
+          setWeeks: w => { currentWeeks = (typeof w === 'function' ? w(currentWeeks) : w); setWeeks(currentWeeks); },
+          currentWeekId, setCurrentWeekId,
+          profile: currentProfile, 
+          setProfile: p => { currentProfile = (typeof p === 'function' ? p(currentProfile) : p); setProfile(currentProfile); }
+        };
         executeToolCall(tc.name, tc.input, appState);
       });
       setPendingWeekProposal(null);
@@ -304,16 +317,26 @@ export function CoachView({
     const toolResults = [];
     const toolMessages = [];
     const newHighlights = new Set();
-    let currentSchedule = snapshot.schedule;
-    let currentGoals = snapshot.goals;
-    let currentMemory = snapshot.coachMemory;
+    const undoSnapshot = { schedule, goals, coachMemory };
+    let currentSchedule = schedule;
+    let currentGoals = goals;
+    let currentMemory = coachMemory;
+    let currentWeeks = weeks;
+    let currentProfile = profile;
 
     for (const tu of activeTools) {
       const appState = {
-        schedule: currentSchedule, setSchedule: s => { currentSchedule = s; setSchedule(s); },
-        goals: currentGoals, setGoals: g => { currentGoals = g; setGoals(g); },
-        coachMemory: currentMemory, setCoachMemory: m => { currentMemory = m; setCoachMemory(m); },
-        weeks, setWeeks, currentWeekId, setCurrentWeekId, profile, setProfile
+        schedule: currentSchedule, 
+        setSchedule: s => { currentSchedule = (typeof s === 'function' ? s(currentSchedule) : s); setSchedule(currentSchedule); },
+        goals: currentGoals, 
+        setGoals: g => { currentGoals = (typeof g === 'function' ? g(currentGoals) : g); setGoals(currentGoals); },
+        coachMemory: currentMemory, 
+        setCoachMemory: m => { currentMemory = (typeof m === 'function' ? m(currentMemory) : m); setCoachMemory(currentMemory); },
+        weeks: currentWeeks, 
+        setWeeks: w => { currentWeeks = (typeof w === 'function' ? w(currentWeeks) : w); setWeeks(currentWeeks); },
+        currentWeekId, setCurrentWeekId,
+        profile: currentProfile, 
+        setProfile: p => { currentProfile = (typeof p === 'function' ? p(currentProfile) : p); setProfile(currentProfile); }
       };
       const res = executeToolCall(tu.name, tu.input, appState);
       toolResults.push({ tool_use_id: tu.id, tool_name: tu.name, content: JSON.stringify(res) });
@@ -325,7 +348,7 @@ export function CoachView({
     setHighlightedExercises(newHighlights);
     setTimeout(() => setHighlightedExercises(new Set()), 3000);
 
-    const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map((tu, i) => ({ ...tu, result: toolMessages[i]?.result })), snapshot };
+    const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map((tu, i) => ({ ...tu, result: toolMessages[i]?.result })), snapshot: undoSnapshot };
     const updatedWithResult = [...originalMsgs.filter(m => !m.isPending), assistantMsg];
     updateConversation(updatedWithResult);
 

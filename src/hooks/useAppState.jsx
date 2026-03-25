@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { get, set, keys } from 'idb-keyval';
 import { getWeekId } from '../utils';
 import { translations } from '../translations';
@@ -238,11 +238,14 @@ export function useAppState() {
     }
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, setAppVersion]);
 
-  const schedule = weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;
-  const setSchedule = (newSchedule) => {
+  const schedule = useMemo(() => {
+    return weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;
+  }, [weeks, currentWeekId]);
+
+  const setSchedule = useCallback((newSchedule) => {
     if (!currentWeekId) return;
     setWeeks(prev => ({ ...(prev || {}), [currentWeekId]: newSchedule }));
-  };
+  }, [setWeeks, currentWeekId]);
 
   return {
     profile, setProfile,

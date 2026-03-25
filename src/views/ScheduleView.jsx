@@ -108,7 +108,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       if (ex.done) {
         const logId = generateId();
         const exerciseSnapshot = JSON.parse(JSON.stringify(ex));
-        const placeholderLog = {
+        const initialLogData = {
           ...exerciseSnapshot,
           id: logId,
           originId: sessionOriginId,
@@ -121,11 +121,10 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
           focus: 0,
           notes: exerciseSnapshot.notes || 'Sessione veloce dallo Schedule'
         };
-        setLogs(prev => [placeholderLog, ...prev]);
-        setQuickLogTarget({ exercise: ex, logId, day });
+        setQuickLogTarget({ exercise: ex, day, initialLogData });
       } else {
         // Se togli la spunta, elimina il log associato
-        setLogs(prev => prev.filter(l => l.originId !== sessionOriginId));
+        setLogs(prev => prev.filter(l => l.originId === sessionOriginId ? false : true));
       }
     }
   };
@@ -931,14 +930,18 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
           exercise={quickLogTarget.exercise}
           logs={logs}
           onSave={(logData) => {
-            setLogs(prev => prev.map(l =>
-              l.id === quickLogTarget.logId ? { ...l, ...logData } : l
-            ));
+            const finalLog = {
+              ...quickLogTarget.initialLogData,
+              ...logData
+            };
+            setLogs(prev => [finalLog, ...prev]);
             setQuickLogTarget(null);
           }}
-          onSkip={() => setQuickLogTarget(null)}
+          onSkip={() => {
+            setLogs(prev => [quickLogTarget.initialLogData, ...prev]);
+            setQuickLogTarget(null);
+          }}
           onCancel={() => {
-            setLogs(prev => prev.filter(l => l.id !== quickLogTarget.logId));
             const undoSchedule = { ...schedule };
             const undoEx = undoSchedule[quickLogTarget.day]?.find(e => e.id === quickLogTarget.exercise.id);
             if (undoEx) undoEx.done = false;
