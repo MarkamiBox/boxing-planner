@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts';
 import { Trash2, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { getWeekId } from '../utils';
@@ -42,26 +42,29 @@ export function StatsView({ logs, setLogs }) {
   const [bodyMapRange, setBodyMapRange] = useState(30);
 
   // ─── KPI Computations ────────────────────────────────────────────────────────
-  const typeCounts = logs.reduce((acc, log) => {
+  const typeCounts = useMemo(() => logs.reduce((acc, log) => {
     acc[log.type] = (acc[log.type] || 0) + 1;
     return acc;
-  }, {});
+  }, {}), [logs]);
+
   const totalSessions = logs.length;
-  const totalMinutes = logs.reduce((acc, l) => acc + parseMins(l), 0);
+
+  const totalMinutes = useMemo(() => logs.reduce((acc, l) => acc + parseMins(l), 0), [logs]);
+
   const totalHours = (totalMinutes / 60).toFixed(1);
 
   // ─── Performance Trend (per-session) ─────────────────────────────────────────
-  const trendData = [...logs].reverse().filter(l => l.energy > 0).map(log => ({
+  const trendData = useMemo(() => [...logs].reverse().filter(l => l.energy > 0).map(log => ({
     date: log.date.substring(5),
     energy: log.energy,
     cardio: log.cardio,
     legs: log.legs,
     intensity: log.intensity || 0,
     focus: log.focus || 0,
-  }));
+  })), [logs]);
 
   // ─── Body & Recovery Trend ───────────────────────────────────────────────────
-  const bodyData = [...logs]
+  const bodyData = useMemo(() => [...logs]
     .reverse()
     .filter(l => l.bodyWeight || l.sleepHours || l.sleepQuality)
     .map(log => ({
@@ -69,41 +72,45 @@ export function StatsView({ logs, setLogs }) {
       weight: log.bodyWeight || null,
       sleep: log.sleepHours || null,
       quality: log.sleepQuality || null,
-    }));
+    })), [logs]);
 
   // ─── Weekly Load Bar Chart ───────────────────────────────────────────────────
-  const weeklyMap = {};
-  logs.forEach(log => {
-    const wId = log.weekId || (log.date ? getWeekId(new Date(log.date)) : null);
-    if (!wId) return;
-    if (!weeklyMap[wId]) weeklyMap[wId] = { wId, mins: 0, sessions: 0 };
-    weeklyMap[wId].mins += parseMins(log);
-    weeklyMap[wId].sessions += 1;
-  });
-  const weeklyData = Object.values(weeklyMap)
-    .sort((a, b) => a.wId.localeCompare(b.wId))
-    .slice(-12)
-    .map(w => ({ week: w.wId.split('-W')[1], hours: +(w.mins / 60).toFixed(1), sessions: w.sessions }));
+  const weeklyData = useMemo(() => {
+    const weeklyMap = {};
+    logs.forEach(log => {
+      const wId = log.weekId || (log.date ? getWeekId(new Date(log.date)) : null);
+      if (!wId) return;
+      if (!weeklyMap[wId]) weeklyMap[wId] = { wId, mins: 0, sessions: 0 };
+      weeklyMap[wId].mins += parseMins(log);
+      weeklyMap[wId].sessions += 1;
+    });
+    return Object.values(weeklyMap)
+      .sort((a, b) => a.wId.localeCompare(b.wId))
+      .slice(-12)
+      .map(w => ({ week: w.wId.split('-W')[1], hours: +(w.mins / 60).toFixed(1), sessions: w.sessions }));
+  }, [logs]);
 
   // ─── Per-type Boxscore ───────────────────────────────────────────────────────
-  const typeStats = {};
-  logs.filter(l => l.energy > 0).forEach(log => {
-    if (!typeStats[log.type]) typeStats[log.type] = { count: 0, energy: 0, cardio: 0, intensity: 0, focus: 0 };
-    const t = typeStats[log.type];
-    t.count++;
-    t.energy += log.energy || 0;
-    t.cardio += log.cardio || 0;
-    t.intensity += log.intensity || 0;
-    t.focus += log.focus || 0;
-  });
-  const boxscoreData = Object.entries(typeStats).map(([type, s]) => ({
-    type,
-    Energy: +(s.energy / s.count).toFixed(1),
-    Cardio: +(s.cardio / s.count).toFixed(1),
-    Intensity: +(s.intensity / s.count).toFixed(1),
-    Focus: +(s.focus / s.count).toFixed(1),
-    sessions: s.count,
-  }));
+  const boxscoreData = useMemo(() => {
+    const typeStats = {};
+    logs.filter(l => l.energy > 0).forEach(log => {
+      if (!typeStats[log.type]) typeStats[log.type] = { count: 0, energy: 0, cardio: 0, intensity: 0, focus: 0 };
+      const t = typeStats[log.type];
+      t.count++;
+      t.energy += log.energy || 0;
+      t.cardio += log.cardio || 0;
+      t.intensity += log.intensity || 0;
+      t.focus += log.focus || 0;
+    });
+    return Object.entries(typeStats).map(([type, s]) => ({
+      type,
+      Energy: +(s.energy / s.count).toFixed(1),
+      Cardio: +(s.cardio / s.count).toFixed(1),
+      Intensity: +(s.intensity / s.count).toFixed(1),
+      Focus: +(s.focus / s.count).toFixed(1),
+      sessions: s.count,
+    }));
+  }, [logs]);
 
   // ─── Personal Records ────────────────────────────────────────────────────────
   const validLogs = logs.filter(l => l.energy > 0);
@@ -115,31 +122,116 @@ export function StatsView({ logs, setLogs }) {
   };
 
   // ─── Heatmap ─────────────────────────────────────────────────────────────────
-  const today = new Date();
-  const heatmapDays = [];
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split('T')[0];
-    const logsOnDay = logs.filter(l => l.date === key);
-    heatmapDays.push({
-      date: key,
-      count: logsOnDay.length,
-      types: [...new Set(logsOnDay.map(l => l.type))],
-    });
-  }
+  const heatmapDays = useMemo(() => {
+    const today = new Date();
+    const arr = [];
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const logsOnDay = logs.filter(l => l.date === key);
+      arr.push({
+        date: key,
+        count: logsOnDay.length,
+        types: [...new Set(logsOnDay.map(l => l.type))],
+      });
+    }
+    return arr;
+  }, [logs]);
 
   // ─── Running Analytics ───────────────────────────────────────────────────────
-  const runningLogs = logs
-    .filter(l => l.type === 'Running' && (l.distance || l.pace))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const runningData = useMemo(() => {
+    const runningLogsList = logs
+      .filter(l => l.type === 'Running' && (l.distance || l.pace))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-  const runningData = runningLogs.map(log => ({
-    date: log.date.substring(5),
-    distance: parseDistance(log.distance),
-    pace: parsePaceToMins(log.pace),
-    displayPace: log.pace
-  }));
+    return runningLogsList.map(log => ({
+      date: log.date.substring(5),
+      distance: parseDistance(log.distance),
+      pace: parsePaceToMins(log.pace),
+      displayPace: log.pace
+    }));
+  }, [logs]);
+
+  // --- Ranked Zones (Body Map) ---
+  const ranked = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (bodyMapRange === 0 ? 99999 : bodyMapRange));
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const rangeLogs = logs.filter(l => l.bodyMap && (bodyMapRange === 0 || l.date >= cutoffStr));
+    const totalSess = rangeLogs.length;
+
+    const zoneAgg = {};
+    rangeLogs.forEach(log => {
+      const maxR = log.plannedDuration || 0;
+      Object.entries(log.bodyMap).forEach(([zoneId, entry]) => {
+        if (zoneId.startsWith('custom_')) return;
+        const wi = getWeightedIntensity(entry.intensity, entry.roundLogged, maxR);
+        if (!zoneAgg[zoneId]) zoneAgg[zoneId] = { sum: 0, count: 0, sessions: new Set() };
+        zoneAgg[zoneId].sum += wi;
+        zoneAgg[zoneId].count += 1;
+        zoneAgg[zoneId].sessions.add(log.id);
+      });
+    });
+
+    return Object.entries(zoneAgg)
+      .map(([zoneId, agg]) => ({
+        zoneId,
+        avgWI: agg.sum / agg.count,
+        sessions: agg.sessions.size,
+        freqMult: agg.sessions.size / (totalSess || 1),
+      }))
+      .sort((a, b) => (b.avgWI * b.freqMult) - (a.avgWI * a.freqMult))
+      .slice(0, 5);
+  }, [logs, bodyMapRange]);
+
+  // --- Cumulative Body Map ---
+  const cumulativeBodyMap = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (bodyMapRange === 0 ? 99999 : bodyMapRange));
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const rangeLogs = logs.filter(l => l.bodyMap && (bodyMapRange === 0 || l.date >= cutoffStr));
+    const totalSess = rangeLogs.length;
+
+    const zoneAgg = {};
+    rangeLogs.forEach(log => {
+      const maxR = log.plannedDuration || 0;
+      Object.entries(log.bodyMap).forEach(([zoneId, entry]) => {
+        if (zoneId.startsWith('custom_')) return;
+        const wi = getWeightedIntensity(entry.intensity, entry.roundLogged, maxR);
+        if (!zoneAgg[zoneId]) zoneAgg[zoneId] = { sum: 0, count: 0, sessions: new Set() };
+        zoneAgg[zoneId].sum += wi;
+        zoneAgg[zoneId].count += 1;
+        zoneAgg[zoneId].sessions.add(log.id);
+      });
+    });
+
+    const map = {};
+    Object.entries(zoneAgg).forEach(([zoneId, agg]) => {
+      const avgWI = agg.sum / agg.count;
+      const freqMult = agg.sessions.size / (totalSess || 1);
+      const display = Math.min(5, avgWI * freqMult * 2);
+      map[zoneId] = { intensity: display, roundLogged: 0 };
+    });
+    return map;
+  }, [logs, bodyMapRange]);
+
+  // --- Streak Warnings ---
+  const streakWarnings = useMemo(() => {
+    const sortedLogs = [...logs].filter(l => l.bodyMap).sort((a, b) => a.date.localeCompare(b.date));
+    const warnings = [];
+    const allZoneIds = [...new Set(sortedLogs.flatMap(l => Object.keys(l.bodyMap).filter(k => !k.startsWith('custom_'))))];
+    allZoneIds.forEach(zoneId => {
+      let streak = 0;
+      let maxStreak = 0;
+      sortedLogs.forEach(log => {
+        if (log.bodyMap[zoneId]) { streak++; maxStreak = Math.max(maxStreak, streak); }
+        else streak = 0;
+      });
+      if (maxStreak >= 3) warnings.push({ zoneId, streak: maxStreak });
+    });
+    return warnings;
+  }, [logs]);
 
   const totalRunningDist = runningData.reduce((acc, d) => acc + (d.distance || 0), 0).toFixed(1);
   const runsWithPace = runningData.filter(d => d.pace);
@@ -482,60 +574,12 @@ export function StatsView({ logs, setLogs }) {
 
       {/* ── Body Map ── */}
       {activeTab === 'bodymap' && (() => {
-        // Filter logs by selected range
+        // Pre-calculating totalSess for the UI logic
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - (bodyMapRange === 0 ? 99999 : bodyMapRange));
         const cutoffStr = cutoff.toISOString().split('T')[0];
         const rangeLogs = logs.filter(l => l.bodyMap && (bodyMapRange === 0 || l.date >= cutoffStr));
         const totalSess = rangeLogs.length;
-
-        // Aggregate per zone
-        const zoneAgg = {}; // zoneId -> { sum, count, sessions (Set of log ids) }
-        rangeLogs.forEach(log => {
-          const maxR = log.plannedDuration || 0;
-          Object.entries(log.bodyMap).forEach(([zoneId, entry]) => {
-            if (zoneId.startsWith('custom_')) return;
-            const wi = getWeightedIntensity(entry.intensity, entry.roundLogged, maxR);
-            if (!zoneAgg[zoneId]) zoneAgg[zoneId] = { sum: 0, count: 0, sessions: new Set() };
-            zoneAgg[zoneId].sum += wi;
-            zoneAgg[zoneId].count += 1;
-            zoneAgg[zoneId].sessions.add(log.id);
-          });
-        });
-
-        // Build cumulative bodyMap for display (average weighted intensity)
-        const cumulativeBodyMap = {};
-        Object.entries(zoneAgg).forEach(([zoneId, agg]) => {
-          const avgWI = agg.sum / agg.count;
-          const freqMult = agg.sessions.size / (totalSess || 1);
-          const display = Math.min(5, avgWI * freqMult * 2); // scale so freq affects color
-          cumulativeBodyMap[zoneId] = { intensity: display, roundLogged: 0 };
-        });
-
-        // Ranked zones top 5
-        const ranked = Object.entries(zoneAgg)
-          .map(([zoneId, agg]) => ({
-            zoneId,
-            avgWI: agg.sum / agg.count,
-            sessions: agg.sessions.size,
-            freqMult: agg.sessions.size / (totalSess || 1),
-          }))
-          .sort((a, b) => (b.avgWI * b.freqMult) - (a.avgWI * a.freqMult))
-          .slice(0, 5);
-
-        // Streak warnings: find zones sore in 3+ consecutive sessions
-        const sortedLogs = [...logs].filter(l => l.bodyMap).sort((a, b) => a.date.localeCompare(b.date));
-        const streakWarnings = [];
-        const allZoneIds = [...new Set(sortedLogs.flatMap(l => Object.keys(l.bodyMap).filter(k => !k.startsWith('custom_'))))];
-        allZoneIds.forEach(zoneId => {
-          let streak = 0;
-          let maxStreak = 0;
-          sortedLogs.forEach(log => {
-            if (log.bodyMap[zoneId]) { streak++; maxStreak = Math.max(maxStreak, streak); }
-            else streak = 0;
-          });
-          if (maxStreak >= 3) streakWarnings.push({ zoneId, streak: maxStreak });
-        });
 
         // Zone label helper
         const ZONE_LABELS = {

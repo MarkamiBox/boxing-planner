@@ -657,6 +657,22 @@ function parsePeriodizationEntry(text) {
   };
 }
 
+export function pruneMemory(coachMemory) {
+  const pruned = {};
+  const categories = ['preferences', 'observations', 'decisions', 'injuries'];
+  categories.forEach(cat => {
+    const entries = coachMemory[cat] || [];
+    if (entries.length <= 20) {
+      pruned[cat] = entries;
+    } else {
+      pruned[cat] = [...entries]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+    }
+  });
+  return pruned;
+}
+
 export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages, availability, availabilityTemplate, locations }) {
   const today = new Date().toLocaleDateString('it-IT', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -669,7 +685,8 @@ export function buildSystemPrompt({ profile, schedule, currentWeekId, logs, goal
     ? active.map(g => `  [${g.type.toUpperCase()}] "${g.text}"${g.targetDate ? ` → ${g.targetDate}` : ''}`).join('\n')
     : '  No active goals.';
 
-  const memText = Object.entries(coachMemory || {}).map(([cat, entries]) => {
+  const prunedMemory = pruneMemory(coachMemory || {});
+  const memText = Object.entries(prunedMemory).map(([cat, entries]) => {
     if (!entries?.length) return '';
     return `  ${cat.toUpperCase()}:\n${entries.map(e => `    - ${typeof e === 'string' ? e : e.text}`).join('\n')}`;
   }).filter(Boolean).join('\n');

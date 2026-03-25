@@ -148,6 +148,18 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     }
   }, [activeWorkout, isGuided, phase, currentStepIdx]);
 
+  const workerRef = useRef(null);
+
+  useEffect(() => {
+    workerRef.current = new Worker('/timerWorker.js');
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+    };
+  }, []);
+
   // Robust background-proof timer execution
   useEffect(() => {
     if (isRunning && isReady) {
@@ -155,40 +167,43 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
         timerRef.current.expectedEndTime = Date.now() + (timeLeft * 1000);
       }
 
-      timerRef.current.interval = setInterval(() => {
-        const now = Date.now();
+      workerRef.current.postMessage({ type: 'START', intervalMs: 250 });
 
-        if (statsTracker.current.lastActive) {
-          statsTracker.current.actualDuration += (now - statsTracker.current.lastActive) / 1000;
-        }
-        statsTracker.current.lastActive = now;
+      workerRef.current.onmessage = (e) => {
+        if (e.data.type === 'TICK') {
+          const now = e.data.now;
 
-        const absoluteTimeLeft = Math.ceil((timerRef.current.expectedEndTime - now) / 1000);
+          if (statsTracker.current.lastActive) {
+            statsTracker.current.actualDuration += (now - statsTracker.current.lastActive) / 1000;
+          }
+          statsTracker.current.lastActive = now;
 
-        if (absoluteTimeLeft <= 0) {
-          handlePhaseTransition();
-          delete timerRef.current.expectedEndTime;
-        } else {
-          setTimeLeft(absoluteTimeLeft);
-          if (absoluteTimeLeft <= 3 && absoluteTimeLeft > 0 && soundEnabled && !timerRef.current['beeped' + absoluteTimeLeft]) {
-            playBeep('short', !soundEnabled);
-            timerRef.current['beeped' + absoluteTimeLeft] = true;
+          const absoluteTimeLeft = Math.ceil((timerRef.current.expectedEndTime - now) / 1000);
+
+          if (absoluteTimeLeft <= 0) {
+            handlePhaseTransition();
+            delete timerRef.current.expectedEndTime;
+          } else {
+            setTimeLeft(absoluteTimeLeft);
+            if (absoluteTimeLeft <= 3 && absoluteTimeLeft > 0 && soundEnabled && !timerRef.current['beeped' + absoluteTimeLeft]) {
+              playBeep('short', !soundEnabled);
+              timerRef.current['beeped' + absoluteTimeLeft] = true;
+            }
           }
         }
-      }, 250);
+      };
     } else {
       statsTracker.current.lastActive = null;
-      if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
+      if (workerRef.current) workerRef.current.postMessage({ type: 'STOP' });
       delete timerRef.current.expectedEndTime;
     }
 
     return () => {
-      if (timerRef.current?.interval) clearInterval(timerRef.current.interval);
       delete timerRef.current.beeped1;
       delete timerRef.current.beeped2;
       delete timerRef.current.beeped3;
     };
-  }, [isRunning, isReady, phase, currentRound, isGuided, currentStepIdx, timeLeft, soundEnabled]);
+  }, [isRunning, isReady, phase, currentRound, isGuided, currentStepIdx, soundEnabled]);
 
 
 

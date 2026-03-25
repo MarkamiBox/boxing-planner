@@ -199,9 +199,17 @@ export function executeToolCall(toolName, toolInput, appState) {
         source: 'coach'
       };
 
+      let newCategoryArray = [...(coachMemory[category] || []), newEntry];
+      if (newCategoryArray.length > 20) {
+        console.info(`Pruning coach memory category "${category}": removing ${newCategoryArray.length - 20} old entries.`);
+        newCategoryArray = newCategoryArray
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+          .slice(-20);
+      }
+
       setCoachMemory({
         ...coachMemory,
-        [category]: [...(coachMemory[category] || []), newEntry]
+        [category]: newCategoryArray
       });
 
       return { success: true, message: `Stored in ${category}: "${newEntry.text}"` };

@@ -54,8 +54,31 @@ function renderMarkdownInline(line) {
     else result.push(<em key={`i-${match.index}`}>{match[2]}</em>);
     lastIdx = match.index + match[0].length;
   }
-  if (lastIdx < line.length) result.push(line.slice(lastIdx));
-  return result;
+    if (lastIdx < line.length) result.push(line.slice(lastIdx));
+    return result;
+}
+
+function archiveConversationIfNeeded(conversation) {
+    if (conversation.messages.length <= 30) return conversation;
+
+    const topics = [];
+    for (let i = 0; i < conversation.messages.length; i += 5) {
+        const chunk = conversation.messages.slice(i, i + 5);
+        const firstUser = chunk.find(m => m.role === 'user');
+        if (firstUser) topics.push(firstUser.content.slice(0, 25).trim());
+    }
+    const topicsStr = topics.join(', ').slice(0, 120);
+
+    const summaryString = `Archived ${conversation.messages.length} messages from ${new Date(conversation.createdAt).toLocaleDateString('it-IT')}. Topics covered: ${topicsStr}${topicsStr.length >= 120 ? '...' : ''}.`;
+
+    return {
+        ...conversation,
+        messages: [{
+            role: 'assistant',
+            content: '[Conversation archived] ' + summaryString
+        }],
+        isArchived: true
+    };
 }
 
 export function CoachView({
@@ -217,11 +240,21 @@ export function CoachView({
     setInputText('');
     setError('');
     const userMsg = { role: 'user', content: text };
-    const updatedMessages = [...messages, userMsg];
-    updateConversation(updatedMessages);
+    let updatedMessages = [...messages, userMsg];
+
+    const maybeArchived = archiveConversationIfNeeded({ ...currentConv, messages: updatedMessages });
+    if (maybeArchived.isArchived && !currentConv.isArchived) {
+      updatedMessages = maybeArchived.messages;
+      updateConversation(updatedMessages);
+    } else {
+      updateConversation(updatedMessages);
+    }
+
     setIsLoading(true);
     try {
-      const apiMessages = updatedMessages.filter(m => m.role === 'user' || m.role === 'assistant');
+      const apiMessages = updatedMessages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-20);
       const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessages, availability, availabilityTemplate, locations: profile.locations });
 
       let accText = '';
@@ -532,7 +565,7 @@ export function CoachView({
         {coachConversations.length > 0 && (
           <div className="coach-header-row coach-conv-selector">
             <select className="session-select" value={activeConvId || ''} onChange={e => setActiveConvId(e.target.value)}>
-              {coachConversations.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+              {coachConversations.map(c => <option key={c.id} value={c.id}>{c.title}{c.isArchived ? ' (archived)' : ''}</option>)}
             </select>
             <button className="btn-icon danger" onClick={() => deleteConversation(activeConvId)} title="Elimina conversazione">
               <Trash2 size={14} />

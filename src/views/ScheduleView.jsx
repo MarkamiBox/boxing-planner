@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
@@ -31,6 +31,18 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   // JSON Import state
   const [jsonImport, setJsonImport] = useState({ open: false, mode: 'day', text: '', error: '' });
+
+  const lastLogByName = useMemo(() => {
+    const map = {};
+    (logs || []).forEach(log => {
+      if (log.name && log.energy > 0) {
+        if (!map[log.name] || log.date > map[log.name].date) {
+          map[log.name] = log;
+        }
+      }
+    });
+    return map;
+  }, [logs]);
 
   // Swipe gesture tracking
   const swipeStartX = useRef(null);
@@ -778,6 +790,24 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                       )}
                     </div>
                     {ex.notes && <p className="ex-notes" style={{ whiteSpace: 'pre-line' }}>{ex.notes}</p>}
+
+                    {(() => {
+                      const last = lastLogByName[ex.name];
+                      if (!last) return null;
+                      return (
+                        <div style={{
+                          display: 'flex', gap: '0.5rem', marginTop: '4px', flexWrap: 'wrap',
+                          fontSize: '0.75rem', color: 'var(--text-muted)',
+                          borderLeft: '2px solid var(--border-color)', paddingLeft: '8px'
+                        }}>
+                          <span>Last: {last.date}</span>
+                          {last.duration && <span>· {last.duration}</span>}
+                          {last.energy > 0 && <span>· E:{last.energy}</span>}
+                          {last.cardio > 0 && <span>C:{last.cardio}</span>}
+                          {last.intensity > 0 && <span>I:{last.intensity}</span>}
+                        </div>
+                      );
+                    })()}
 
                     {ex.steps && ex.steps.length > 0 && (
                       <div style={{ marginTop: '0.5rem' }}>
