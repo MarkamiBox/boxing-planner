@@ -448,8 +448,14 @@ export function AvailabilityCalendar({
     }
   };
 
-  const finalizeMove = (e) => {
-    if (e && e.cancelable) e.preventDefault();
+  const finalizeMove = useCallback((e) => {
+    if (e && e.cancelable) {
+      // Only prevent default if we actually did something (dragged or created)
+      if (dragging || (creatingDrag && creatingDrag.startRowIndex !== creatingDrag.endRowIndex)) {
+        e.preventDefault();
+      }
+    }
+
     if (dragging && dragOver) {
       const { day: newDay, rowIndex: newRowIndex } = dragOver;
       const { day: oldDay, slot, span } = dragging;
@@ -474,7 +480,7 @@ export function AvailabilityCalendar({
           return next;
         });
       }
-    } else if (creatingDrag) {
+    } else if (creatingDrag && creatingDrag.startRowIndex !== creatingDrag.endRowIndex) {
       const { day, startRowIndex, endRowIndex } = creatingDrag;
       const start = Math.min(startRowIndex, endRowIndex);
       const end = Math.max(startRowIndex, endRowIndex) + 1;
@@ -498,7 +504,13 @@ export function AvailabilityCalendar({
     setDragging(null);
     setDragOver(null);
     setCreatingDrag(null);
-  };
+  }, [dragging, dragOver, creatingDrag, setAvailability, setAvailabilityTemplate, setActiveForm]);
+
+  const resetDragState = useCallback(() => {
+    setDragging(null);
+    setDragOver(null);
+    setCreatingDrag(null);
+  }, []);
 
   const getCellFromEvent = (e) => {
     const clientX = e.clientX ?? e.touches?.[0]?.clientX;
@@ -512,7 +524,7 @@ export function AvailabilityCalendar({
   };
 
   const handleTouchStart = (e, day, rowIndex, slot = null) => {
-    if (e.cancelable) e.preventDefault();
+    // DO NOT preventDefault here, as it blocks scrolling
     if (slot) {
       const startIdx = slotIndexFromTime(slot.start);
       const endIdx = slotIndexFromTime(slot.end);
@@ -524,14 +536,19 @@ export function AvailabilityCalendar({
 
   const handleMove = (e) => {
     if (!dragging && !creatingDrag) return;
-    if (e.cancelable) e.preventDefault();
 
     const cell = getCellFromEvent(e);
     if (!cell) return;
 
     if (dragging) {
+      // If we are dragging an existing slot, we want to prevent scrolling
+      if (e.cancelable) e.preventDefault();
       handleDragOver(cell.day, cell.rowIndex);
     } else if (creatingDrag && cell.day === creatingDrag.day) {
+      // For multi-cell creation, only prevent scroll if we've actually moved to a different row
+      if (cell.rowIndex !== creatingDrag.startRowIndex) {
+        if (e.cancelable) e.preventDefault();
+      }
       setCreatingDrag(prev => ({ ...prev, endRowIndex: cell.rowIndex }));
     }
   };
@@ -610,7 +627,7 @@ export function AvailabilityCalendar({
             gridColumn: dayIdx + 2,
             gridRow: rowIndex + 2,
             position: 'relative',
-            touchAction: 'none'
+            touchAction: 'auto'
           }}
           onClick={(e) => {
             if (!creatingDrag && !dragging) handleCellClick(day, rowIndex, e);
@@ -717,6 +734,7 @@ export function AvailabilityCalendar({
       <div 
         className="av-cal-wrapper" 
         onPointerUp={finalizeMove} 
+        onPointerCancel={resetDragState}
         onPointerLeave={() => { setDragging(null); setDragOver(null); setCreatingDrag(null); }}
         onPointerMove={handleMove}
         onTouchMove={handleMove}
