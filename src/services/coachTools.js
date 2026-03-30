@@ -228,6 +228,10 @@ export function executeToolCall(toolName, toolInput, appState) {
       return { success: true, message: `Updated ${skill}: ${oldLevel} → ${level}` };
     }
 
+    case 'analyze_data': {
+      return { success: true, message: 'Analysis completed' };
+    }
+
     default:
       return { success: false, message: `Unknown tool: ${toolName}` };
   }

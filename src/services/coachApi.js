@@ -757,13 +757,14 @@ Data suggests athlete may have reached a goal. Bring it up. Ask if they want to 
 6. Every session MUST have structured steps for the guided timer.
 7. Step durations in seconds. Exercise IDs: Date.now() as string. For any gym/fixed class, include 'isCourse: true' and 'courseLocationId: [index]' in the exercise object.
 8. Body map alerts → immediate load reduction ONLY on affected areas if risk >= 8.
-9. TOOLS AVAILABLE: create_next_week, add_exercise, remove_exercise, reschedule_exercise, modify_session, update_coach_memory, update_goals, update_skill_level.
+9. TOOLS AVAILABLE: create_next_week, add_exercise, remove_exercise, reschedule_exercise, modify_session, update_coach_memory, update_goals, update_skill_level, analyze_data.
 10. PAIN, SORENESS & BODY MAP SCALE:
     1-6/10 (DOMS/Fatigue): Normal muscle work. The athlete just "felt the work" in this area. DO NOT modify the program. DO NOT treat as an injury.
     7/10 (High Fatigue): Monitor. Maybe reduce load on this specific area by 10-20% for the next session, but do NOT trigger injury protocol.
     8-10/10 (Severe/Sharp Pain): Real injury risk. Trigger full INJURY protocol. Modify week immediately.
     Never escalate fatigue (≤7) to an injury just because it repeats. Repetitive DOMS is normal.
-11. INTERVAL & SETS INSTRUCTIONS — MANDATORY FORMAT: For ANY interval or sets step with 2+ rounds, the instruction field MUST use this exact format: 'R1: [specific cue] | R2: [specific cue] | R3: [specific cue]' with one cue per round, each different from the others. R1 = establish rhythm or technique focus. R2 = add intensity or tactical element. R3+ = maintain quality under fatigue or escalate challenge. NEVER write a single generic sentence for multi-round steps. If a step has 5 rounds write R1 through R5. The pipe separator | is mandatory between rounds. This applies to every tool call that creates or modifies sessions: create_next_week, add_exercise, modify_session.`
+11. INTERVAL & SETS INSTRUCTIONS — MANDATORY FORMAT: For ANY interval or sets step with 2+ rounds, the instruction field MUST use this exact format: 'R1: [specific cue] | R2: [specific cue] | R3: [specific cue]' with one cue per round, each different from the others. R1 = establish rhythm or technique focus. R2 = add intensity or tactical element. R3+ = maintain quality under fatigue or escalate challenge. NEVER write a single generic sentence for multi-round steps. If a step has 5 rounds write R1 through R5. The pipe separator | is mandatory between rounds. This applies to every tool call that creates or modifies sessions: create_next_week, add_exercise, modify_session.
+12. If the user only asks for an analysis, an opinion, or a summary (e.g., "I did this today"), EXCLUSIVELY use the analyze_data tool or respond with regular text without using any tools. DO NOT use create_next_week or modify_session unless the user explicitly requests to alter the schedule.`
   ];
 
   return modules.filter(Boolean).join('\n\n');
@@ -772,6 +773,17 @@ Data suggests athlete may have reached a goal. Bring it up. Ask if they want to 
 // ── Part 8 — Tool Definitions ──────────────────────────────────────────────────
 
 export const coachTools = [
+  {
+    name: 'analyze_data',
+    description: 'Analyzes data, provides an opinion or a summary for the user without modifying the schedule in any way. Use this tool or reply textually if the user simply describes what they did (e.g., "I did X today").',
+    input_schema: {
+      type: 'object',
+      required: ['query'],
+      properties: {
+        query: { type: 'string', description: 'The topic, data, or query specified by the user to analyze.' }
+      }
+    }
+  },
   {
     name: 'create_next_week',
     description: 'Create the full training schedule for next week. Replaces any existing schedule for that weekId. Each session must have structured steps for the guided timer. Always include a summary explaining each day choice — it will be shown to athlete for approval before applying.',

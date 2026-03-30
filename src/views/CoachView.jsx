@@ -11,25 +11,33 @@ const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sat
 
 function renderMarkdown(text) {
   if (!text) return null;
-  const lines = text.split('\n');
+  
+  // 1. Pulisce la stringa convertendo gli "escape" \n letterali in veri a capo
+  const normalizedText = text.replace(/\\n/g, '\n');
+  
+  // 2. Divide in righe
+  const lines = normalizedText.split('\n');
   const result = [];
 
   lines.forEach((line, lineIdx) => {
     if (lineIdx > 0) result.push(<br key={`br-${lineIdx}`} />);
+
+    // Se la riga è vuota (es. un doppio \n\n), il <br> sopra basta, non creiamo span vuoti
+    if (line.trim() === '') return;
 
     const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
     if (headerMatch) {
       const level = headerMatch[1].length;
       const content = headerMatch[2];
       const Tag = `h${Math.min(level + 2, 6)}`;
-      result.push(<Tag key={`h-${lineIdx}`} style={{ margin: '8px 0 4px', color: 'var(--primary)' }}>{renderMarkdownInline(content)}</Tag>);
+      result.push(<Tag key={`h-${lineIdx}`} style={{ margin: '12px 0 4px', color: 'var(--primary)' }}>{renderMarkdownInline(content)}</Tag>);
       return;
     }
 
     const listMatch = line.match(/^(\s*)([-*])\s+(.*)$/);
     if (listMatch) {
       result.push(
-        <div key={`li-${lineIdx}`} style={{ paddingLeft: '1rem', position: 'relative', marginBottom: '4px' }}>
+        <div key={`li-${lineIdx}`} style={{ paddingLeft: '1.2rem', position: 'relative', marginBottom: '4px', lineHeight: '1.4' }}>
           <span style={{ position: 'absolute', left: 0, color: 'var(--primary)' }}>•</span>
           {renderMarkdownInline(listMatch[3])}
         </div>
@@ -37,7 +45,11 @@ function renderMarkdown(text) {
       return;
     }
 
-    result.push(<span key={`text-${lineIdx}`}>{renderMarkdownInline(line)}</span>);
+    result.push(
+      <span key={`text-${lineIdx}`} style={{ display: 'inline-block', lineHeight: '1.4' }}>
+        {renderMarkdownInline(line)}
+      </span>
+    );
   });
 
   return result;
@@ -54,31 +66,31 @@ function renderMarkdownInline(line) {
     else result.push(<em key={`i-${match.index}`}>{match[2]}</em>);
     lastIdx = match.index + match[0].length;
   }
-    if (lastIdx < line.length) result.push(line.slice(lastIdx));
-    return result;
+  if (lastIdx < line.length) result.push(line.slice(lastIdx));
+  return result;
 }
 
 function archiveConversationIfNeeded(conversation) {
-    if (conversation.messages.length <= 30) return conversation;
+  if (conversation.messages.length <= 30) return conversation;
 
-    const topics = [];
-    for (let i = 0; i < conversation.messages.length; i += 5) {
-        const chunk = conversation.messages.slice(i, i + 5);
-        const firstUser = chunk.find(m => m.role === 'user');
-        if (firstUser) topics.push(firstUser.content.slice(0, 25).trim());
-    }
-    const topicsStr = topics.join(', ').slice(0, 120);
+  const topics = [];
+  for (let i = 0; i < conversation.messages.length; i += 5) {
+    const chunk = conversation.messages.slice(i, i + 5);
+    const firstUser = chunk.find(m => m.role === 'user');
+    if (firstUser) topics.push(firstUser.content.slice(0, 25).trim());
+  }
+  const topicsStr = topics.join(', ').slice(0, 120);
 
-    const summaryString = `Archived ${conversation.messages.length} messages from ${new Date(conversation.createdAt).toLocaleDateString('it-IT')}. Topics covered: ${topicsStr}${topicsStr.length >= 120 ? '...' : ''}.`;
+  const summaryString = `Archived ${conversation.messages.length} messages from ${new Date(conversation.createdAt).toLocaleDateString('it-IT')}. Topics covered: ${topicsStr}${topicsStr.length >= 120 ? '...' : ''}.`;
 
-    return {
-        ...conversation,
-        messages: [{
-            role: 'assistant',
-            content: '[Conversation archived] ' + summaryString
-        }],
-        isArchived: true
-    };
+  return {
+    ...conversation,
+    messages: [{
+      role: 'assistant',
+      content: '[Conversation archived] ' + summaryString
+    }],
+    isArchived: true
+  };
 }
 
 export function CoachView({
@@ -96,11 +108,11 @@ export function CoachView({
   pendingWeekProposal, setPendingWeekProposal,
   availability,
   availabilityTemplate,
+  isCoachLoading: isLoading, setIsCoachLoading: setIsLoading,
+  coachStreamingText: streamingText, setCoachStreamingText: setStreamingText
 }) {
   const { showConfirm } = useDialog();
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
   const [error, setError] = useState('');
   const [activeConvId, setActiveConvId] = useState(null);
   const [showMemory, setShowMemory] = useState(false);
@@ -140,6 +152,37 @@ export function CoachView({
       setPendingCoachContext(null);
     }
   }, [pendingCoachContext, setPendingCoachContext]);
+
+  useEffect(() => {
+    setError(''); // Clear errors when switching convs
+  }, [activeConvId]);
+
+  const deleteConversation = (id) => {
+    showConfirm('Sei sicuro?', 'Vuoi davvero eliminare questa conversazione?', () => {
+      const newConvs = coachConversations.filter(c => c.id !== id);
+      setCoachConversations(newConvs);
+      if (activeConvId === id) {
+        const remaining = newConvs.length > 0 ? newConvs[0].id : null;
+        setActiveConvId(remaining);
+      }
+    });
+  };
+
+  const createNewConversation = () => {
+    const newConv = { id: Date.now().toString(), title: `Session ${new Date().toLocaleDateString('it-IT')}`, createdAt: new Date().toISOString(), messages: [] };
+    setCoachConversations([newConv, ...coachConversations]);
+    setActiveConvId(newConv.id);
+    setStreamingText('');
+    setError('');
+  };
+
+  if (coachConversations.length === 0 || (!activeConvId && coachConversations.length > 0)) {
+    if (coachConversations.length === 0) {
+      setTimeout(createNewConversation, 0);
+      return null;
+    }
+    if (!activeConvId) setActiveConvId(coachConversations[0].id);
+  }
 
   const anyKeySet = coachSettings.anthropicKey || coachSettings.openrouterKey || coachSettings.googleKey;
 
@@ -199,39 +242,14 @@ export function CoachView({
     );
   }
 
-  useEffect(() => {
-    setError(''); // Clear errors when switching convs
-  }, [activeConvId]);
-
-  const deleteConversation = (id) => {
-    showConfirm('Sei sicuro?', 'Vuoi davvero eliminare questa conversazione?', () => {
-      const newConvs = coachConversations.filter(c => c.id !== id);
-      setCoachConversations(newConvs);
-      if (activeConvId === id) {
-        const remaining = newConvs.length > 0 ? newConvs[0].id : null;
-        setActiveConvId(remaining);
+  const updateConversation = (updater) => {
+    setCoachConversations(prev => prev.map(c => {
+      if (c.id === activeConvId) {
+        const newMessages = typeof updater === 'function' ? updater(c.messages) : updater;
+        return { ...c, messages: newMessages };
       }
-    });
-  };
-
-  const createNewConversation = () => {
-    const newConv = { id: Date.now().toString(), title: `Session ${new Date().toLocaleDateString('it-IT')}`, createdAt: new Date().toISOString(), messages: [] };
-    setCoachConversations([newConv, ...coachConversations]);
-    setActiveConvId(newConv.id);
-    setStreamingText('');
-    setError('');
-  };
-
-  if (coachConversations.length === 0 || (!activeConvId && coachConversations.length > 0)) {
-    if (coachConversations.length === 0) {
-      setTimeout(createNewConversation, 0);
-      return null;
-    }
-    if (!activeConvId) setActiveConvId(coachConversations[0].id);
-  }
-
-  const updateConversation = (newMessages) => {
-    setCoachConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, messages: newMessages } : c));
+      return c;
+    }));
   };
 
   const handleSend = async () => {
@@ -239,57 +257,127 @@ export function CoachView({
     if (!text || isLoading) return;
     setInputText('');
     setError('');
-    const userMsg = { role: 'user', content: text };
-    let updatedMessages = [...messages, userMsg];
 
-    const maybeArchived = archiveConversationIfNeeded({ ...currentConv, messages: updatedMessages });
-    if (maybeArchived.isArchived && !currentConv.isArchived) {
-      updatedMessages = maybeArchived.messages;
-      updateConversation(updatedMessages);
-    } else {
-      updateConversation(updatedMessages);
-    }
+    const userMsg = { role: 'user', content: text };
+    
+    // Calcoliamo la chat successiva in modo completamente sincrono per l'API
+    const localNewMessages = [...messages, userMsg];
+    const maybeArchived = archiveConversationIfNeeded({ ...currentConv, messages: localNewMessages });
+    const finalNewMessages = maybeArchived.isArchived ? maybeArchived.messages : localNewMessages;
+
+    // Aggiorniamo la UI usando il callback per sicurezza React
+    updateConversation(prev => {
+       const next = [...prev, userMsg];
+       const arc = archiveConversationIfNeeded({ ...currentConv, messages: next });
+       return arc.isArchived ? arc.messages : next;
+    });
+
+    const apiMessagesToSend = finalNewMessages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(-20);
 
     setIsLoading(true);
+    setStreamingText('Working on it...'); // Optimistic UI: feedback immediato
     try {
-      const apiMessages = updatedMessages
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .slice(-20);
-      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessages, availability, availabilityTemplate, locations: profile.locations });
+      const systemPrompt = buildSystemPrompt({ profile, schedule, currentWeekId, logs, goals, coachMemory, weeks, messages: apiMessagesToSend, availability, availabilityTemplate, locations: profile.locations });
 
       let accText = '';
       const result = await sendCoachMessage({
-        apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt, messages: apiMessages,
-        onTextChunk: (chunk) => { accText += chunk; setStreamingText(accText); }
+        apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt, messages: apiMessagesToSend,
+        onTextChunk: (chunk) => {
+          if (accText === '') accText = chunk;
+          else accText += chunk;
+          setStreamingText(accText);
+        }
       });
 
-      if (result.toolUses && result.toolUses.length > 0) {
-        const createNextWeekTool = result.toolUses.find(tu => tu.name === 'create_next_week');
+      const createNextWeekTool = result.toolUses?.find(tu => tu.name === 'create_next_week');
+      const mutationTools = ['add_exercise', 'remove_exercise', 'reschedule_exercise', 'modify_session'];
+      const hasMutationTools = result.toolUses?.some(tu => mutationTools.includes(tu.name));
+      const hasValidTools = result.toolUses && result.toolUses.length > 0;
+      const isSilentToolOnly = hasValidTools && !createNextWeekTool && !hasMutationTools;
 
-        if (createNextWeekTool) {
-          // Found a Sunday Proposal
-          setPendingWeekProposal({
-            weekId: createNextWeekTool.input.weekId || '',
-            schedule: createNextWeekTool.input.schedule,
-            summary: createNextWeekTool.input.summary || 'Proposta pronta per essere revisionata.',
-            createdAt: new Date().toISOString(),
-            toolCalls: result.toolUses
-          });
-          const assistantMsg = { role: 'assistant', content: result.text || 'Ho preparato una proposta per la prossima settimana.', convId: activeConvId };
-          const finalMsgs = [...updatedMessages, assistantMsg];
-          updateConversation(finalMsgs);
-        } else {
-          // General pending tools
-          const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map(tu => ({ ...tu, isPending: true })), isPending: true, convId: activeConvId };
-          const finalMsgs = [...updatedMessages, assistantMsg];
-          updateConversation(finalMsgs);
-          setPendingTools({ convId: activeConvId, tools: result.toolUses, snapshot: { schedule, goals, coachMemory }, result, originalMsgs: finalMsgs });
-        }
+      let assistantMsg;
+
+      if (createNextWeekTool) {
+        assistantMsg = { role: 'assistant', content: result.text || 'Ho preparato una proposta per la prossima settimana.', convId: activeConvId };
+      } else if (hasValidTools) {
+        assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map(tu => ({ ...tu, isPending: !isSilentToolOnly })), isPending: !isSilentToolOnly, convId: activeConvId };
       } else {
-        updateConversation([...updatedMessages, { role: 'assistant', content: result.text }]);
+        assistantMsg = { role: 'assistant', content: result.text };
+      }
+
+      updateConversation(prev => [...prev, assistantMsg]);
+
+      if (createNextWeekTool) {
+        setPendingWeekProposal({
+          weekId: createNextWeekTool.input.weekId || '',
+          schedule: createNextWeekTool.input.schedule,
+          summary: createNextWeekTool.input.summary || 'Proposta pronta per essere revisionata.',
+          createdAt: new Date().toISOString(),
+          toolCalls: result.toolUses
+        });
+      } else if (hasValidTools) {
+        if (isSilentToolOnly) {
+          let currentSchedule = schedule;
+          let currentGoals = goals;
+          let currentMemory = coachMemory;
+          let currentWeeks = weeks;
+          let currentProfile = profile;
+
+          const toolResults = [];
+          const toolMessages = [];
+
+          for (const tu of result.toolUses) {
+            const appState = {
+              schedule: currentSchedule, setSchedule: s => { currentSchedule = typeof s === 'function' ? s(currentSchedule) : s; setSchedule(currentSchedule); },
+              goals: currentGoals, setGoals: g => { currentGoals = typeof g === 'function' ? g(currentGoals) : g; setGoals(currentGoals); },
+              coachMemory: currentMemory, setCoachMemory: m => { currentMemory = typeof m === 'function' ? m(currentMemory) : m; setCoachMemory(currentMemory); },
+              weeks: currentWeeks, setWeeks: w => { currentWeeks = typeof w === 'function' ? w(currentWeeks) : w; setWeeks(currentWeeks); },
+              currentWeekId, setCurrentWeekId,
+              profile: currentProfile, setProfile: p => { currentProfile = typeof p === 'function' ? p(currentProfile) : p; setProfile(currentProfile); }
+            };
+            const res = executeToolCall(tu.name, tu.input, appState);
+            toolResults.push({ tool_use_id: tu.id, tool_name: tu.name, content: JSON.stringify(res) });
+            toolMessages.push({ role: 'tool', toolName: tu.name, toolInput: tu.input, result: res });
+          }
+
+          const updatedAssistantMsg = { 
+            ...assistantMsg, 
+            toolCalls: result.toolUses.map((tu, i) => ({ ...tu, result: toolMessages[i].result }))
+          };
+
+          const msgsForFollowUp = [...apiMessagesToSend, updatedAssistantMsg];
+
+          updateConversation(prev => {
+             const msgs = [...prev];
+             if (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') {
+                 msgs[msgs.length - 1] = updatedAssistantMsg;
+             } else {
+                 msgs.push(updatedAssistantMsg); // Fallback ultra-safe: non rimpiazza messaggi user
+             }
+             return msgs;
+          });
+
+          const followUpSystemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory, weeks, messages: msgsForFollowUp, availability, availabilityTemplate, locations: profile.locations });
+
+          let accFollowUp = '';
+          const followUp = await sendToolResults({
+            apiKey: coachSettings.apiKey, model: coachSettings.model, systemPrompt: followUpSystemPrompt,
+            messages: msgsForFollowUp.filter(m => m.role === 'user' || m.role === 'assistant'),
+            toolResults, onTextChunk: c => { accFollowUp += c; setStreamingText(accFollowUp); }
+          });
+
+          if (followUp.text) {
+             updateConversation(prev => [...prev, { role: 'assistant', content: followUp.text }]);
+          }
+        } else {
+          const finalMsgsSnapshot = [...finalNewMessages, assistantMsg];
+          setPendingTools({ convId: activeConvId, tools: result.toolUses, snapshot: { schedule, goals, coachMemory }, result, originalMsgs: finalMsgsSnapshot });
+        }
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Errore di connessione. Riprova.');
     } finally {
       setIsLoading(false);
       setStreamingText('');
@@ -307,16 +395,16 @@ export function CoachView({
 
       pendingWeekProposal.toolCalls.forEach(tc => {
         const appState = {
-          schedule: currentSchedule, 
+          schedule: currentSchedule,
           setSchedule: s => { currentSchedule = (typeof s === 'function' ? s(currentSchedule) : s); setSchedule(currentSchedule); },
-          goals: currentGoals, 
+          goals: currentGoals,
           setGoals: g => { currentGoals = (typeof g === 'function' ? g(currentGoals) : g); setGoals(currentGoals); },
-          coachMemory: currentMemory, 
+          coachMemory: currentMemory,
           setCoachMemory: m => { currentMemory = (typeof m === 'function' ? m(currentMemory) : m); setCoachMemory(currentMemory); },
-          weeks: currentWeeks, 
+          weeks: currentWeeks,
           setWeeks: w => { currentWeeks = (typeof w === 'function' ? w(currentWeeks) : w); setWeeks(currentWeeks); },
           currentWeekId, setCurrentWeekId,
-          profile: currentProfile, 
+          profile: currentProfile,
           setProfile: p => { currentProfile = (typeof p === 'function' ? p(currentProfile) : p); setProfile(currentProfile); }
         };
         executeToolCall(tc.name, tc.input, appState);
@@ -350,7 +438,7 @@ export function CoachView({
     const toolResults = [];
     const toolMessages = [];
     const newHighlights = new Set();
-    const undoSnapshot = { schedule, goals, coachMemory };
+    const undoSnapshot = structuredClone({ schedule, goals, coachMemory });
     let currentSchedule = schedule;
     let currentGoals = goals;
     let currentMemory = coachMemory;
@@ -359,16 +447,16 @@ export function CoachView({
 
     for (const tu of activeTools) {
       const appState = {
-        schedule: currentSchedule, 
+        schedule: currentSchedule,
         setSchedule: s => { currentSchedule = (typeof s === 'function' ? s(currentSchedule) : s); setSchedule(currentSchedule); },
-        goals: currentGoals, 
+        goals: currentGoals,
         setGoals: g => { currentGoals = (typeof g === 'function' ? g(currentGoals) : g); setGoals(currentGoals); },
-        coachMemory: currentMemory, 
+        coachMemory: currentMemory,
         setCoachMemory: m => { currentMemory = (typeof m === 'function' ? m(currentMemory) : m); setCoachMemory(currentMemory); },
-        weeks: currentWeeks, 
+        weeks: currentWeeks,
         setWeeks: w => { currentWeeks = (typeof w === 'function' ? w(currentWeeks) : w); setWeeks(currentWeeks); },
         currentWeekId, setCurrentWeekId,
-        profile: currentProfile, 
+        profile: currentProfile,
         setProfile: p => { currentProfile = (typeof p === 'function' ? p(currentProfile) : p); setProfile(currentProfile); }
       };
       const res = executeToolCall(tu.name, tu.input, appState);
@@ -382,8 +470,9 @@ export function CoachView({
     setTimeout(() => setHighlightedExercises(new Set()), 3000);
 
     const assistantMsg = { role: 'assistant', content: result.text || '', toolCalls: result.toolUses.map((tu, i) => ({ ...tu, result: toolMessages[i]?.result })), snapshot: undoSnapshot };
+    
     const updatedWithResult = [...originalMsgs.filter(m => !m.isPending), assistantMsg];
-    updateConversation(updatedWithResult);
+    updateConversation(() => updatedWithResult);
 
     try {
       const systemPrompt = buildSystemPrompt({ profile, schedule: currentSchedule, currentWeekId, logs, goals: currentGoals, coachMemory: currentMemory, weeks, messages: updatedWithResult, availability, availabilityTemplate, locations: profile.locations });
@@ -393,7 +482,7 @@ export function CoachView({
         messages: updatedWithResult.filter(m => m.role === 'user' || m.role === 'assistant'),
         toolResults, onTextChunk: c => { accText += c; setStreamingText(accText); }
       });
-      if (followUp.text) updateConversation([...updatedWithResult, { role: 'assistant', content: followUp.text }]);
+      if (followUp.text) updateConversation(prev => [...prev, { role: 'assistant', content: followUp.text }]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -403,7 +492,7 @@ export function CoachView({
   };
 
   const handleReject = () => {
-    updateConversation(pendingTools.originalMsgs.filter(m => !m.isPending));
+    updateConversation(prev => prev.filter(m => !m.isPending));
     setPendingTools(null);
     setDisabledToolIndices(new Set());
     setOverrides({});

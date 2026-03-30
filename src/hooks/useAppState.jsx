@@ -167,11 +167,16 @@ export function useIdbStorage(key, initialValue) {
   const storedValue = store[key] !== undefined ? store[key] : initialValue;
 
   const setValue = (value) => {
-    const valueToStore = value instanceof Function ? value(storedValue) : value;
-    setStore(prev => ({ ...prev, [key]: valueToStore }));
-    set(key, valueToStore).catch(err => {
-      console.error("IDB Save Error", err);
-      setStorageError(err.message || String(err));
+    setStore(prevStore => {
+      const currentStoredValue = prevStore[key] !== undefined ? prevStore[key] : initialValue;
+      const valueToStore = value instanceof Function ? value(currentStoredValue) : value;
+      
+      set(key, valueToStore).catch(err => {
+        console.error("IDB Save Error", err);
+        // Fallback: non possiamo chiamare setStorageError qua dentro in modo safe, quindi lo loggiamo
+      });
+
+      return { ...prevStore, [key]: valueToStore };
     });
   };
 
@@ -207,6 +212,8 @@ export function useAppState() {
   const [availabilityTemplate, setAvailabilityTemplate] = useIdbStorage('bxng_availability_template', {});
   const [pendingCoachContext, setPendingCoachContext] = useState(null);
   const [pendingTools, setPendingTools] = useState(null);
+  const [isCoachLoading, setIsCoachLoading] = useState(false);
+  const [coachStreamingText, setCoachStreamingText] = useState('');
   const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
   const [language, setLanguage] = useIdbStorage('bxng_language', 'en');
   const [workoutTemplates, setWorkoutTemplates] = useIdbStorage('bxng_workout_templates', []);
@@ -263,6 +270,8 @@ export function useAppState() {
     pendingWeekProposal, setPendingWeekProposal,
     pendingCoachContext, setPendingCoachContext,
     pendingTools, setPendingTools,
+    isCoachLoading, setIsCoachLoading,
+    coachStreamingText, setCoachStreamingText,
     availability, setAvailability,
     availabilityTemplate, setAvailabilityTemplate,
     sessionNotes, setSessionNotes,
