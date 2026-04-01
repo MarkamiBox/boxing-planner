@@ -210,8 +210,8 @@ export function useAppState() {
   const [pendingWeekProposal, setPendingWeekProposal] = useIdbStorage('bxng_pending_week_proposal', null);
   const [availability, setAvailability] = useIdbStorage('bxng_availability', {});
   const [availabilityTemplate, setAvailabilityTemplate] = useIdbStorage('bxng_availability_template', {});
-  const [pendingCoachContext, setPendingCoachContext] = useState(null);
-  const [pendingTools, setPendingTools] = useState(null);
+  const [pendingCoachContext, setPendingCoachContext] = useIdbStorage('bxng_pending_coach_context', null);
+  const [pendingTools, setPendingTools] = useIdbStorage('bxng_pending_tools', null);
   const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [coachStreamingText, setCoachStreamingText] = useState('');
   const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
