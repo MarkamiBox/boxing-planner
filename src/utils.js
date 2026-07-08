@@ -23,6 +23,37 @@ export function getTodayDayName() {
 }
 
 /**
+ * Returns an array of 7 Date objects (Mon→Sun) for the given weekId (e.g. "2026-W12").
+ * Uses ISO week numbering (Monday = first day).
+ */
+export function getWeekDates(weekId) {
+  if (!weekId) return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    const day = d.getDay() || 7;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - day + 1 + i);
+    return monday;
+  });
+  const [y, w] = weekId.split('-W');
+  const year = parseInt(y, 10);
+  const week = parseInt(w, 10);
+  // Jan 4 is always in ISO week 1
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayOfWeek = jan4.getUTCDay() || 7; // 1=Mon, 7=Sun
+  // Monday of week 1
+  const monday1 = new Date(jan4);
+  monday1.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1);
+  // Monday of target week
+  const mondayOfWeek = new Date(monday1);
+  mondayOfWeek.setUTCDate(monday1.getUTCDate() + (week - 1) * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mondayOfWeek);
+    d.setUTCDate(mondayOfWeek.getUTCDate() + i);
+    return d;
+  });
+}
+
+/**
  * Formats seconds into MM:SS 
  */
 export function formatTime(seconds) {

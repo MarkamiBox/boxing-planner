@@ -238,6 +238,16 @@ export function useAppState() {
     } else if (!currentWeekId) {
       // Fallback if currentWeekId is missing but weeks exist
       setCurrentWeekId(todayWeekId);
+    } else if (currentWeekId !== todayWeekId) {
+      // Re-align active week to real date (e.g., after leaving the PWA open overnight)
+      setCurrentWeekId(todayWeekId);
+      if (weeks && !weeks[todayWeekId]) {
+        // Create an empty week — no silent clone
+        setWeeks(prev => ({
+          ...(prev || {}),
+          [todayWeekId]: { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] }
+        }));
+      }
     }
 
     // Update app version tracking without wiping user data
@@ -245,6 +255,33 @@ export function useAppState() {
       setAppVersion(APP_VERSION);
     }
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, setAppVersion]);
+
+  // Re-sync active week when the tab becomes visible again (handles multi-day PWA sessions)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const real = getWeekId();
+        if (currentWeekId && real !== currentWeekId) {
+          setCurrentWeekId(real);
+          setWeeks(prev => {
+            if (prev && !prev[real]) {
+              return {
+                ...prev,
+                [real]: { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] }
+              };
+            }
+            return prev;
+          });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [currentWeekId, setCurrentWeekId, setWeeks]);
 
   const schedule = useMemo(() => {
     return weeks && currentWeekId && weeks[currentWeekId] ? weeks[currentWeekId] : initialSchedule;

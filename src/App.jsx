@@ -240,7 +240,9 @@ function App() {
     <ErrorBoundary>
       <DialogProvider>
         <AppStateProvider>
-          <AppContent />
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
         </AppStateProvider>
       </DialogProvider>
     </ErrorBoundary>

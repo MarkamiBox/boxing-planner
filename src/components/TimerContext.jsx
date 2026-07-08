@@ -186,10 +186,14 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
             delete timerRef.current.expectedEndTime;
           } else {
             setTimeLeft(absoluteTimeLeft);
-            if (absoluteTimeLeft <= 3 && absoluteTimeLeft > 0 && soundEnabled && !timerRef.current['beeped' + absoluteTimeLeft]) {
-              playBeep('short', !soundEnabled);
-              timerRef.current['beeped' + absoluteTimeLeft] = true;
-            }
+            // Countdown beeps: 10s, 5s, 3s, 2s, 1s
+            const beepPoints = [10, 5, 3, 2, 1];
+            beepPoints.forEach(pt => {
+              if (absoluteTimeLeft === pt && soundEnabled && !timerRef.current['beeped' + pt]) {
+                playBeep('short', !soundEnabled);
+                timerRef.current['beeped' + pt] = true;
+              }
+            });
           }
         }
       };
@@ -203,6 +207,8 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       delete timerRef.current.beeped1;
       delete timerRef.current.beeped2;
       delete timerRef.current.beeped3;
+      delete timerRef.current.beeped5;
+      delete timerRef.current.beeped10;
     };
   }, [isRunning, isReady, phase, currentRound, isGuided, currentStepIdx, soundEnabled]);
 

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
-import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime, generateId, sanitizeExercise, sanitizeSchedule } from '../utils';
+import { getTodayDayName, getWeekId, getWeekDates, formatTime, calculateDuration, addMinutesToTime, generateId, sanitizeExercise, sanitizeSchedule } from '../utils';
 import { useAppState } from '../hooks/useAppState';
 import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
@@ -12,8 +12,33 @@ const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sat
 export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs, onDirtyStateChange, workoutTemplates, setWorkoutTemplates }) {
   const { showAlert, showConfirm } = useDialog();
   const { t, language } = useAppState();
-  const todayDay = getTodayDayName();
-  const isCurrentWeek = currentWeekId === getWeekId();
+
+  // ── Robust todayDay: updates on visibilitychange so it never stays fossilized
+  const [todayDay, setTodayDay] = useState(() => getTodayDayName());
+  useEffect(() => {
+    const refresh = () => setTodayDay(getTodayDayName());
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+
+  // ── viewedWeekId is pure UI navigation; currentWeekId is the active (real) week
+  const [viewedWeekId, setViewedWeekId] = useState(currentWeekId || getWeekId());
+  // Keep viewedWeekId in sync when active week changes externally (e.g. day rollover)
+  const prevActiveWeekRef = useRef(currentWeekId);
+  useEffect(() => {
+    if (currentWeekId && currentWeekId !== prevActiveWeekRef.current) {
+      // Active week rolled over — snap the view back to active week
+      setViewedWeekId(currentWeekId);
+      prevActiveWeekRef.current = currentWeekId;
+    }
+  }, [currentWeekId]);
+
+  const isViewingActive = viewedWeekId === currentWeekId;
+
   const [activeDay, setActiveDay] = useState(todayDay);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -24,9 +49,11 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const [editForm, setEditForm] = useState({ name: '', type: 'Boxing', notes: '', plannedTime: '', steps: [], isCourse: false, courseLocationId: '', courseId: '', courseIdx: '' });
   const [cloneMenuOpen, setCloneMenuOpen] = useState(false);
   const [deletedItem, setDeletedItem] = useState(null); // { day, exercise, index }
+  const [weekUndoItem, setWeekUndoItem] = useState(null); // { weekId, prevSchedule, label }
   const undoTimerRef = useRef(null);
+  const weekUndoTimerRef = useRef(null);
   
-  React.useEffect(() => {
+  useEffect(() => {
     onDirtyStateChange?.(editingId !== null);
   }, [editingId, onDirtyStateChange]);
 
@@ -89,38 +116,44 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   };
 
   const changeWeek = (direction) => {
-    if (!currentWeekId || !weeks) return;
-    const { y, w } = parseWeek(currentWeekId);
+    const baseId = viewedWeekId || currentWeekId;
+    if (!baseId || !weeks) return;
+    const { y, w } = parseWeek(baseId);
     let newY = y;
     let newW = w + direction;
     if (newW > 52) { newW = 1; newY++; }
     if (newW < 1) { newW = 52; newY--; }
 
     const newId = getWeekString(newY, newW);
+    // Pure navigation — no auto-clone, no IDB write
+    setViewedWeekId(newId);
+    // If the viewed week has no data yet, we do NOT clone; the empty state shows a prompt
+  };
 
-    // Auto-clone if new week is empty
-    if (!weeks[newId]) {
-      const cloned = JSON.parse(JSON.stringify(schedule));
-      Object.keys(cloned).forEach(day => {
-        cloned[day].forEach(ex => ex.done = false);
-      });
-      setWeeks(prev => ({ ...(prev || {}), [newId]: cloned }));
-    }
-    setCurrentWeekId(newId);
+  // ── The viewed schedule (uses viewedWeekId for display)
+  const viewedSchedule = useMemo(() => {
+    if (weeks && viewedWeekId && weeks[viewedWeekId]) return weeks[viewedWeekId];
+    return { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  }, [weeks, viewedWeekId]);
+
+  // setSchedule writes to the VIEWED week
+  const setViewedSchedule = (newSchedule) => {
+    setWeeks(prev => ({ ...(prev || {}), [viewedWeekId]: newSchedule }));
   };
 
   const toggleDone = (day, exerciseId) => {
-    const originalEx = schedule[day]?.find(e => e.id === exerciseId);
+    // Toggle is on the viewed schedule
+    const originalEx = viewedSchedule[day]?.find(e => e.id === exerciseId);
     if (!originalEx) return;
 
     const newDoneState = !originalEx.done;
     const newSchedule = {
-      ...schedule,
-      [day]: schedule[day].map(e => e.id === exerciseId ? { ...e, done: newDoneState } : e)
+      ...viewedSchedule,
+      [day]: viewedSchedule[day].map(e => e.id === exerciseId ? { ...e, done: newDoneState } : e)
     };
-    
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
 
+    // originId always references the ACTIVE week (so logs are pinned to the real week)
     const sessionOriginId = `${currentWeekId}-${day}-${exerciseId}`;
 
     if (newDoneState) {
@@ -132,7 +165,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
         id: logId,
         originId: sessionOriginId,
         date: new Date().toISOString().split('T')[0],
-        weekId: currentWeekId,
+        weekId: currentWeekId,  // always the real active week
         energy: 0,
         cardio: 0,
         legs: 0,
@@ -164,25 +197,25 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   const saveEdit = (day) => {
     const newSchedule = {
-      ...schedule,
-      [day]: schedule[day].map(e => e.id === editingId ? { ...e, ...editForm } : e)
+      ...viewedSchedule,
+      [day]: viewedSchedule[day].map(e => e.id === editingId ? { ...e, ...editForm } : e)
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     setEditingId(null);
   };
 
   const deleteExercise = (day, exerciseId) => {
-    const exerciseToDelete = schedule[day]?.find(e => e.id === exerciseId);
-    const exerciseIdx = schedule[day]?.findIndex(e => e.id === exerciseId);
+    const exerciseToDelete = viewedSchedule[day]?.find(e => e.id === exerciseId);
+    const exerciseIdx = viewedSchedule[day]?.findIndex(e => e.id === exerciseId);
     if (!exerciseToDelete) return;
 
     setDeletedItem({ day, exercise: exerciseToDelete, index: exerciseIdx });
 
     const newSchedule = {
-      ...schedule,
-      [day]: schedule[day].filter(e => e.id !== exerciseId)
+      ...viewedSchedule,
+      [day]: viewedSchedule[day].filter(e => e.id !== exerciseId)
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     setEditingId(null);
 
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
@@ -194,38 +227,39 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const undoDelete = () => {
     if (!deletedItem) return;
     const { day, exercise, index } = deletedItem;
-    const arr = [...(schedule[day] || [])];
+    const arr = [...(viewedSchedule[day] || [])];
     arr.splice(index, 0, exercise);
     const newSchedule = {
-      ...schedule,
+      ...viewedSchedule,
       [day]: arr
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     setDeletedItem(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   };
 
   const moveExercise = (day, idx, dir) => {
-    const arr = [...(schedule[day] || [])];
+    const arr = [...(viewedSchedule[day] || [])];
     const target = idx + dir;
     if (target < 0 || target >= arr.length) return;
     [arr[idx], arr[target]] = [arr[target], arr[idx]];
     const newSchedule = {
-      ...schedule,
+      ...viewedSchedule,
       [day]: arr
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
   };
 
   const copyExerciseTo = (ex, targetDay) => {
     const cloned = JSON.parse(JSON.stringify(ex));
     cloned.id = generateId();
+    cloned.steps = (cloned.steps || []).map(s => ({ ...s, id: generateId() }));
     cloned.done = false;
     const newSchedule = {
-      ...schedule,
-      [targetDay]: [...(schedule[targetDay] || []), cloned]
+      ...viewedSchedule,
+      [targetDay]: [...(viewedSchedule[targetDay] || []), cloned]
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     setCopyPickerFor(null);
   };
 
@@ -241,34 +275,65 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       steps: []
     };
     const newSchedule = {
-      ...schedule,
-      [day]: [...(schedule[day] || []), newExercise]
+      ...viewedSchedule,
+      [day]: [...(viewedSchedule[day] || []), newExercise]
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     startEdit(newExercise);
   };
 
+  // ── Week undo helper
+  const triggerWeekUndo = (label, prevSchedule) => {
+    setWeekUndoItem({ weekId: viewedWeekId, prevSchedule, label });
+    if (weekUndoTimerRef.current) clearTimeout(weekUndoTimerRef.current);
+    weekUndoTimerRef.current = setTimeout(() => setWeekUndoItem(null), 8000);
+  };
+
+  const undoWeekChange = () => {
+    if (!weekUndoItem) return;
+    setWeeks(prev => ({ ...(prev || {}), [weekUndoItem.weekId]: weekUndoItem.prevSchedule }));
+    setWeekUndoItem(null);
+    if (weekUndoTimerRef.current) clearTimeout(weekUndoTimerRef.current);
+  };
+
   const handleCloneLastWeek = () => {
-    const { y, w } = parseWeek(currentWeekId);
+    const { y, w } = parseWeek(viewedWeekId);
     let newY = y; let newW = w - 1;
     if (newW < 1) { newW = 52; newY--; }
     const prevWeekId = getWeekString(newY, newW);
-    const prevSchedule = weeks[prevWeekId];
-    if (prevSchedule) {
-      const cloned = JSON.parse(JSON.stringify(prevSchedule));
+    const prevScheduleData = weeks[prevWeekId];
+    if (prevScheduleData) {
+      const cloned = JSON.parse(JSON.stringify(prevScheduleData));
       Object.keys(cloned).forEach(d => cloned[d].forEach(ex => ex.done = false));
-      setSchedule(cloned);
-      showAlert('Successo', `Settimana ${prevWeekId} clonata con successo in ${currentWeekId}.`);
+      triggerWeekUndo('Clona settimana precedente', viewedSchedule);
+      setViewedSchedule(cloned);
     } else {
       showAlert('Errore', `Nessuna programmazione trovata per la settimana ${prevWeekId}.`);
     }
     setCloneMenuOpen(false);
   };
+
+  // Called from empty state button: clone previous week into the currently viewed empty week
+  const handleCloneFromPrevious = () => {
+    const { y, w } = parseWeek(viewedWeekId);
+    let newY = y; let newW = w - 1;
+    if (newW < 1) { newW = 52; newY--; }
+    const prevWeekId = getWeekString(newY, newW);
+    const prevScheduleData = weeks[prevWeekId];
+    if (prevScheduleData) {
+      const cloned = JSON.parse(JSON.stringify(prevScheduleData));
+      Object.keys(cloned).forEach(d => cloned[d].forEach(ex => ex.done = false));
+      setViewedSchedule(cloned);
+    } else {
+      showAlert('Errore', 'Nessuna settimana precedente trovata.');
+    }
+  };
   
   const handleClearWeek = () => {
     showConfirm('Pulisci Settimana', "Sei sicuro di voler svuotare l'intera settimana?", () => {
       const blank = { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
-      setSchedule(blank);
+      triggerWeekUndo('Svuota settimana', viewedSchedule);
+      setViewedSchedule(blank);
     });
     setCloneMenuOpen(false);
   };
@@ -288,7 +353,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     if (jsonImport.mode === 'week') {
       try {
         const sanitizedWeek = sanitizeSchedule(parsed);
-        setSchedule(sanitizedWeek);
+        triggerWeekUndo('Import settimana JSON', viewedSchedule);
+        setViewedSchedule(sanitizedWeek);
         closeJsonImport();
         showAlert('Successo', 'Settimana importata e sanitizzata correttamente!');
       } catch (err) {
@@ -302,12 +368,12 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     const normalised = rawExercises.map((e, i) => sanitizeExercise(e, `import-d-${generateId()}-${i}`));
 
     const newSchedule = {
-      ...schedule,
-      [activeDay]: [...(schedule[activeDay] || []), ...normalised]
+      ...viewedSchedule,
+      [activeDay]: [...(viewedSchedule[activeDay] || []), ...normalised]
     };
-    setSchedule(newSchedule);
+    setViewedSchedule(newSchedule);
     closeJsonImport();
-    showAlert('Import OK', `${ normalised.length } esercizio / i aggiunto / i a ${ activeDay.charAt(0).toUpperCase() + activeDay.slice(1) }.`);
+    showAlert('Import OK', `${normalised.length} esercizio/i aggiunto/i a ${activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}.`);
   };
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -462,10 +528,13 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   };
   // -------------------------
 
-  const activeExercises = schedule[activeDay] || [];
+  const activeExercises = viewedSchedule[activeDay] || [];
+
+  // Pre-compute week dates for day number chips
+  const weekDates = useMemo(() => getWeekDates(viewedWeekId), [viewedWeekId]);
 
   const getDayCompletion = (day) => {
-    const exs = schedule[day] || [];
+    const exs = viewedSchedule[day] || [];
     if (exs.length === 0) return null;
     const done = exs.filter(e => e.done).length;
     return { done, total: exs.length };
@@ -483,30 +552,26 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     return `~${m}min total`;
   };
 
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${ m.toString().padStart(2, '0') }: ${ s.toString().padStart(2, '0') }`;
-  };
-
   const formatStepDescription = (step) => {
-    if (step.type === 'timer' || step.type === 'manual_timer') return `${ formatTime(step.duration)
-    } \u231A`;
-    if (step.type === 'interval') return `${ step.rounds } Rnd x ${ formatTime(step.work) } / ${formatTime(step.rest)}`;
+    if (step.type === 'timer' || step.type === 'manual_timer') return `${formatTime(step.duration)} ⏺`;
+    if (step.type === 'interval') return `${step.rounds} Rnd x ${formatTime(step.work)} / ${formatTime(step.rest)}`;
     if (step.type === 'sets') return `${step.sets} Set x ${step.reps} (Rest: ${formatTime(step.rest)})`;
-    return '\uD83D\uDCDD';
+    return '📝';
   };
 
   return (
     <div className="page-container schedule-view">
       <div className="schedule-header">
         <h1 className="page-title">{t('schedule')}</h1>
-        {currentWeekId && (
+        {(viewedWeekId || currentWeekId) && (
           <div className="week-nav">
             <button className="btn-icon" onClick={() => changeWeek(-1)} style={{ padding: '2px' }}><ChevronLeft size={20} /></button>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {isViewingActive ? (
+                <span className="week-badge-active">Questa settimana</span>
+              ) : null}
               <span className="week-range-text">
-                {getWeekDateRange(currentWeekId)}
+                {getWeekDateRange(viewedWeekId || currentWeekId)}
               </span>
               <button className="btn-text" style={{ padding: '2px 4px', marginLeft: '4px', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setCloneMenuOpen(!cloneMenuOpen)}>
                 <ChevronDown size={16} />
@@ -523,6 +588,58 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
           </div>
         )}
       </div>
+
+      {/* Banner: viewing past or future week */}
+      {!isViewingActive && (
+        <div className="week-context-banner" style={{
+          background: 'rgba(245, 158, 11, 0.12)',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          borderRadius: '10px',
+          padding: '0.6rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          fontSize: '0.85rem',
+          color: '#fcd34d',
+        }}>
+          <span>📅 Stai guardando la settimana del {getWeekDateRange(viewedWeekId)}</span>
+          <button
+            className="btn-primary"
+            style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem', flexShrink: 0 }}
+            onClick={() => setViewedWeekId(currentWeekId)}
+          >
+            Torna ad oggi
+          </button>
+        </div>
+      )}
+
+      {/* Undo banner: week-level destructive operation */}
+      {weekUndoItem && (
+        <div className="undo-banner" style={{
+          position: 'fixed',
+          bottom: '160px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--surface)',
+          border: '1px solid #f59e0b',
+          color: 'var(--text-main)',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          zIndex: 2001,
+          animation: 'slideUpUndo 0.3s ease-out',
+          whiteSpace: 'nowrap'
+        }}>
+          <span style={{ fontSize: '0.9rem' }}>Settimana modificata ({weekUndoItem.label})</span>
+          <button className="btn-primary" onClick={undoWeekChange} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Annulla</button>
+          <button onClick={() => setWeekUndoItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
+        </div>
+      )}
 
       {deletedItem && (
         <div className="undo-banner" style={{
@@ -549,15 +666,18 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       )}
 
       <div className="days-selector">
-        {daysOfWeek.map(day => {
+        {daysOfWeek.map((day, dayIdx) => {
           const comp = getDayCompletion(day);
+          const dayDate = weekDates[dayIdx];
+          const dayNum = dayDate ? dayDate.getUTCDate() : '';
           return (
             <button
               key={day}
-              className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay && isCurrentWeek ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
+              className={`day-btn ${activeDay === day ? 'active' : ''} ${day === todayDay && isViewingActive ? 'today' : ''} ${comp && comp.done === comp.total && comp.total > 0 ? 'day-complete' : ''}`}
               onClick={() => requestDayChange(day)}
             >
-              {t('short_days')[daysOfWeek.indexOf(day)]}
+              <span className="day-btn-label">{t('short_days')[dayIdx]}</span>
+              <span className="day-btn-num">{dayNum}</span>
               {comp && (
                 <span style={{ display: 'block', fontSize: '0.6rem', opacity: 0.8, marginTop: '1px' }}>
                   {comp.done}/{comp.total}
@@ -630,7 +750,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                     className="btn-primary"
                     style={{ padding:'0.3rem 0.6rem', fontSize:'0.75rem' }}
                     onClick={() => {
-                      const newSchedule = { ...schedule }
+                      const newSchedule = { ...viewedSchedule }
                       const newId = generateId()
                       newSchedule[activeDay] = [
                         ...(newSchedule[activeDay] || []),
@@ -646,7 +766,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                           })) : []
                         }
                       ]
-                      setSchedule(newSchedule)
+                      setViewedSchedule(newSchedule)
                       setShowTemplatePicker(false)
                     }}
                   >Use</button>
@@ -668,10 +788,24 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
         {activeExercises.length === 0 ? (
           <div className="empty-state">
             {t('rest_day')}
-            {activeDay === todayDay && isCurrentWeek && (
-              <div style={{ marginTop: '8px', fontSize: '0.8rem' }}>
-                Tap + to add an exercise, or ask your Coach to plan this week.
+            {viewedSchedule && Object.values(viewedSchedule).every(arr => arr.length === 0) && !isViewingActive ? (
+              // Empty week that was navigated to
+              <div style={{ marginTop: '12px' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Questa settimana è vuota.</p>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
+                  onClick={handleCloneFromPrevious}
+                >
+                  <Copy size={14} style={{ marginRight: '4px' }} /> Copia da settimana precedente
+                </button>
               </div>
+            ) : (
+              activeDay === todayDay && isViewingActive && (
+                <div style={{ marginTop: '8px', fontSize: '0.8rem' }}>
+                  Tap + to add an exercise, or ask your Coach to plan this week.
+                </div>
+              )
             )}
           </div>
         ) : (
@@ -922,6 +1056,25 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                     )}
                     <button className="btn-icon edit-btn" onClick={() => startEdit(ex)}>
                       <Edit2 size={18} />
+                    </button>
+                    {/* Duplicate session */}
+                    <button
+                      className="btn-icon"
+                      title="Duplica sessione"
+                      style={{ padding: '4px', opacity: 0.8 }}
+                      onClick={() => {
+                        const cloned = JSON.parse(JSON.stringify(ex));
+                        cloned.id = generateId();
+                        cloned.done = false;
+                        cloned.steps = (cloned.steps || []).map(s => ({ ...s, id: generateId() }));
+                        const newSchedule = {
+                          ...viewedSchedule,
+                          [activeDay]: [...(viewedSchedule[activeDay] || []), cloned]
+                        };
+                        setViewedSchedule(newSchedule);
+                      }}
+                    >
+                      <Copy size={15} />
                     </button>
 
                     {/* Move up/down */}
