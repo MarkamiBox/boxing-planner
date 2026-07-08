@@ -2,8 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { get, set, keys } from 'idb-keyval';
 import { getWeekId } from '../utils';
 import { translations } from '../translations';
+import { migrateAllWeeks, migrateLogs, migrateWorkoutTemplates, migrateActiveWorkout } from '../migrateSteps';
 
-const APP_VERSION = 'v5'; // Update Presets
+const APP_VERSION = 'v6'; // Step schema: round/timer(autoAdvance)/sets/note
 
 const initialProfile = {
   age: '20-25',
@@ -250,8 +251,21 @@ export function useAppState() {
       }
     }
 
-    // Update app version tracking without wiping user data
+    // Update app version tracking — run migration if needed
     if (appVersion !== APP_VERSION) {
+      // One-shot backup before first migration (idempotent: only if no backup exists)
+      get('bxng_pre_v6_backup').then(existing => {
+        if (!existing && weeks) {
+          set('bxng_pre_v6_backup', { weeks, timestamp: new Date().toISOString() });
+        }
+      });
+
+      // Run step schema migration v5 → v6
+      if (weeks) {
+        const migratedWeeks = migrateAllWeeks(weeks);
+        setWeeks(migratedWeeks);
+      }
+
       setAppVersion(APP_VERSION);
     }
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, setAppVersion]);

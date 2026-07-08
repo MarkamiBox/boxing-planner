@@ -323,7 +323,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
       )}
 
       {/* Main Display Window */}
-      {isGuided && currentStep?.type === 'text' ? (
+      {isGuided && (currentStep?.type === 'text' || currentStep?.type === 'note') ? (
         renderTextStep()
       ) : (
         <div className="timer-display-card" style={{ '--phase-color': getPhaseColor() }}>
@@ -332,7 +332,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
             {getPhaseLabel()}
             {phase !== 'stopped' && phase !== 'prep' && (
               (!isGuided && ` - RND ${currentRound}/${totalRounds}`) ||
-              (isGuided && currentStep?.type === 'interval' && ` - RND ${currentRound}/${currentStep.rounds}`) ||
+              (isGuided && (currentStep?.type === 'interval' || currentStep?.type === 'round') && ` - RND ${currentRound}/${currentStep.rounds}`) ||
               (isGuided && currentStep?.type === 'sets' && ` - REST`)
             )}
           </p>
@@ -350,7 +350,7 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
       )}
 
       {/* Controls */}
-      {(!isGuided || (currentStep && currentStep.type !== 'text' && currentStep.type !== 'sets') || (currentStep && currentStep.type === 'sets' && isRunning)) && (
+      {(!isGuided || (currentStep && currentStep.type !== 'text' && currentStep.type !== 'note' && currentStep.type !== 'sets') || (currentStep && currentStep.type === 'sets' && isRunning)) && (
         <div className="timer-controls">
           <button 
             className="timer-btn skip" 

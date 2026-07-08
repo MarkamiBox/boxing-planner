@@ -111,24 +111,14 @@ export function calculateDuration(workout, locations = [], day = '') {
     workout.steps.forEach(s => {
       let prep = s.prepTime !== undefined ? Number(s.prepTime) : 10;
       if (s.type === 'timer' || s.type === 'manual_timer') totalSec += Number(s.duration || 0) + prep;
-      else if (s.type === 'interval') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
+      else if (s.type === 'interval' || s.type === 'round') totalSec += Number(s.rounds || 1) * (Number(s.work || 0) + Number(s.rest || 0)) + prep;
       else if (s.type === 'sets') totalSec += Number(s.sets || 1) * (Number(s.rest || 60) + prep);
-      else if (s.type === 'text') totalSec += Number(s.duration || 0) + prep;
+      // note/text non contribuiscono alla durata
     });
     stepsDuration = totalSec > 0 ? Math.round(totalSec / 60) : 0;
   }
 
-  const textToSearch = ((workout.notes || '') + ' ' + (workout.name || '')).toLowerCase();
-  
-  let textDuration = 0;
-  const regex = /\b(\d+)\s*(min|m|minutes|minuti)\b/g;
-  let match;
-  while ((match = regex.exec(textToSearch)) !== null) {
-    const val = parseInt(match[1], 10);
-    if (val > textDuration) textDuration = val;
-  }
-
-  let finalDuration = Math.max(stepsDuration, textDuration);
+  let finalDuration = stepsDuration;
 
   if (finalDuration === 0) {
     if (workout.isCourse) finalDuration = 60;

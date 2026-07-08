@@ -72,6 +72,53 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     return map;
   }, [logs]);
 
+  const historicalSteps = useMemo(() => {
+    const stepsMap = new Map();
+    // Default macros that are always available
+    const defaults = [
+      { id: 'def-warmup', type: 'timer', autoAdvance: true, name: 'Riscaldamento', duration: 600, instruction: '', _isDefault: true },
+      { id: 'def-3rnd', type: 'round', name: '3 Rnd (3/1)', work: 180, rest: 60, rounds: 3, instruction: ' | | ', _isDefault: true },
+      { id: 'def-tabata', type: 'round', name: 'Tabata', work: 20, rest: 10, rounds: 8, instruction: ' | | | | | | | ', _isDefault: true }
+    ];
+    defaults.forEach(d => stepsMap.set(d.name.toLowerCase(), d));
+
+    if (weeks) {
+      Object.values(weeks).forEach(weekData => {
+        Object.values(weekData).forEach(dayExs => {
+          if (!Array.isArray(dayExs)) return;
+          dayExs.forEach(ex => {
+            // ONLY EXTRACT MACROS FROM EXERCISES THAT HAVE BEEN COMPLETED (done === true)
+            if (ex.done && Array.isArray(ex.steps)) {
+              ex.steps.forEach(step => {
+                if (step.name && step.name.trim() !== 'New Step') {
+                  const key = step.name.trim().toLowerCase();
+                  if (!stepsMap.has(key)) {
+                    stepsMap.set(key, { ...step, id: generateId(), _isDefault: false });
+                  }
+                }
+              });
+            }
+          });
+        });
+      });
+    }
+    return Array.from(stepsMap.values()).sort((a, b) => {
+      // Keep defaults at top
+      if (a._isDefault !== b._isDefault) return a._isDefault ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [weeks]);
+
+  const getStepMacroLabel = (s) => {
+    let details = '';
+    if (s.type === 'timer' || s.type === 'manual_timer') details = `${Math.round((s.duration||0)/60)}m`;
+    else if (s.type === 'round' || s.type === 'interval') details = `${s.rounds||1}x${Math.round((s.work||0)/60)}'/${Math.round((s.rest||0)/60)}'`;
+    else if (s.type === 'sets') details = `${s.sets||1} set`;
+    else if (s.type === 'note' || s.type === 'text') details = `testo`;
+    
+    return `${s._isDefault ? '🤖' : '👤'} ${s.name} (${details})`;
+  };
+
   // Swipe gesture tracking
   const swipeStartX = useRef(null);
 
@@ -282,6 +329,24 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     startEdit(newExercise);
   };
 
+  const quickAdd = (day, name, type) => {
+    if (!name.trim()) return;
+    const newExercise = {
+      id: generateId(),
+      type: type || 'Boxing',
+      name: name.trim(),
+      done: false,
+      notes: '',
+      plannedTime: '',
+      steps: []
+    };
+    const newSchedule = {
+      ...viewedSchedule,
+      [day]: [...(viewedSchedule[day] || []), newExercise]
+    };
+    setViewedSchedule(newSchedule);
+  };
+
   // ── Week undo helper
   const triggerWeekUndo = (label, prevSchedule) => {
     setWeekUndoItem({ weekId: viewedWeekId, prevSchedule, label });
@@ -392,7 +457,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   // --- Step Builder Core ---
   const addStep = () => {
-    const newStep = { id: generateId(), type: 'timer', name: 'New Step', duration: 180, instruction: '' };
+    const newStep = { id: generateId(), type: 'timer', autoAdvance: true, name: 'New Step', duration: 180, instruction: '' };
     setEditForm({ ...editForm, steps: [...editForm.steps, newStep] });
   };
 
@@ -405,9 +470,10 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       // Start fresh with common fields only
       step = { id, name, type: value, instruction };
 
-      if (value === 'timer' || value === 'manual_timer') {
+      if (value === 'timer') {
         step.duration = 180;
-      } else if (value === 'interval') {
+        step.autoAdvance = true;
+      } else if (value === 'round') {
         step.work = 180;
         step.rest = 60;
         step.rounds = 3;
@@ -416,6 +482,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
         step.reps = '10 reps';
         step.rest = 60;
       }
+      // note type doesn't need extra fields at init
     } else {
       step[field] = value;
     }
@@ -441,7 +508,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const handleInstructionChange = (stepIdx, roundIdx, newValue) => {
     const newSteps = [...editForm.steps];
     const step = newSteps[stepIdx];
-    const rounds = step.type === 'interval' ? (step.rounds || 1) : (step.sets || 1);
+    const rounds = (step.type === 'round' || step.type === 'interval') ? (step.rounds || 1) : (step.sets || 1);
     let parts = (step.instruction || '').split(' | ');
     while (parts.length < rounds) parts.push('');
     parts[roundIdx] = newValue;
@@ -458,11 +525,14 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
             <button onClick={() => moveStep(idx, 1)} disabled={idx === editForm.steps.length - 1} style={{ color: idx === editForm.steps.length - 1 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === editForm.steps.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowDown size={16}/></button>
           </div>
           <select value={step.type} onChange={e => updateStep(idx, 'type', e.target.value)} style={{ flex: 1, padding: '4px', fontSize: '0.85rem' }}>
-            <option value="timer">Timer (Auto)</option>
-            <option value="manual_timer">Timer (Manual Wait)</option>
-            <option value="interval">Intervals</option>
-            <option value="sets">Sets & Reps</option>
-            <option value="text">Text Only</option>
+            <option value="timer">Timer (Durata)</option>
+            <option value="round">Round (Work/Rest)</option>
+            <option value="sets">Set (Reps/Rest)</option>
+            <option value="note">Nota (Solo testo)</option>
+            {/* Legacy fallbacks */}
+            {step.type === 'manual_timer' && <option value="manual_timer">Legacy Timer</option>}
+            {step.type === 'interval' && <option value="interval">Legacy Interval</option>}
+            {step.type === 'text' && <option value="text">Legacy Text</option>}
           </select>
           <button className="btn-icon danger" onClick={() => removeStep(idx)} style={{ padding: '4px' }}><Trash2 size={16}/></button>
         </div>
@@ -470,42 +540,50 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
         <input type="text" placeholder="Step Name" value={step.name} onChange={e => updateStep(idx, 'name', e.target.value)} style={{ width: '100%', marginBottom: '0.5rem', padding: '6px', fontSize: '0.85rem' }} />
 
         {(step.type === 'timer' || step.type === 'manual_timer') && (
-           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-             <TimeInput label="Duration" value={step.duration} onChange={val => updateStep(idx, 'duration', val)} style={{ flex: 1 }} />
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>
+           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+             <TimeInput label="Duration" value={step.duration} onChange={val => updateStep(idx, 'duration', val)} style={{ flex: 1, minWidth: '120px' }} />
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)', minWidth: '80px' }}>
                Prep (s):
                <input type="number" min="0" placeholder="default" value={step.prepTime !== undefined ? step.prepTime : ''} onChange={e => updateStep(idx, 'prepTime', e.target.value === '' ? undefined : Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
+             {step.type === 'timer' && (
+               <label style={{ fontSize: '0.75rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '14px', whiteSpace: 'nowrap' }}>
+                 <input type="checkbox" checked={step.autoAdvance !== false} onChange={e => updateStep(idx, 'autoAdvance', e.target.checked)} />
+                 Auto-advance
+               </label>
+             )}
            </div>
         )}
-        {step.type === 'interval' && (
-           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-             <TimeInput label="Work" value={step.work} onChange={val => updateStep(idx, 'work', val)} style={{ flex: 1 }} />
-             <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Rnds:
+        {(step.type === 'round' || step.type === 'interval') && (
+           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+             <TimeInput label="Work" value={step.work} onChange={val => updateStep(idx, 'work', val)} style={{ flex: 1, minWidth: '80px' }} />
+             <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1, minWidth: '80px' }} />
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)', minWidth: '60px' }}>Rnds:
                <input type="number" value={step.rounds} onChange={e => updateStep(idx, 'rounds', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)', minWidth: '80px' }}>
                Prep (s):
                <input type="number" min="0" placeholder="default" value={step.prepTime !== undefined ? step.prepTime : ''} onChange={e => updateStep(idx, 'prepTime', e.target.value === '' ? undefined : Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
            </div>
         )}
         {step.type === 'sets' && (
-           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)' }}>Sets:
+           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+             <label style={{ fontSize: '0.75rem', flex: 1, color: 'var(--text-muted)', minWidth: '60px' }}>Sets:
                <input type="number" value={step.sets} onChange={e => updateStep(idx, 'sets', Number(e.target.value))} style={{ width: '100%', padding: '4px', marginTop: '2px' }} />
              </label>
-             <label style={{ fontSize: '0.75rem', flex: 1.5, color: 'var(--text-muted)' }}>Reps:
+             <label style={{ fontSize: '0.75rem', flex: 1.5, color: 'var(--text-muted)', minWidth: '100px' }}>Reps:
                <input type="text" value={step.reps || ''} onChange={e => updateStep(idx, 'reps', e.target.value)} style={{ width: '100%', padding: '4px', marginTop: '2px' }} placeholder="e.g. 10 reps" />
              </label>
-             <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
+             <div style={{ flex: 1, minWidth: '80px' }}>
+               <TimeInput label="Rest" value={step.rest} onChange={val => updateStep(idx, 'rest', val)} style={{ width: '100%' }} />
+             </div>
            </div>
         )}
 
-        {((step.type === 'interval' && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
+        {(((step.type === 'round' || step.type === 'interval') && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-             {Array.from({ length: (step.type === 'interval' ? step.rounds : step.sets) }).map((_, rIdx) => {
+             {Array.from({ length: ((step.type === 'round' || step.type === 'interval') ? step.rounds : step.sets) }).map((_, rIdx) => {
                const parts = (step.instruction || '').split(' | ');
                return (
                  <div key={rIdx} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -704,16 +782,14 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
             <button className="btn-icon add-btn" onClick={() => addExercise(activeDay)}>
               <Plus size={20} title={t('add_exercise')} />
             </button>
-            {workoutTemplates?.length > 0 && (
-              <button 
-                className="btn-icon" 
-                title="Load from template"
-                onClick={() => setShowTemplatePicker(!showTemplatePicker)}
-                style={{ color: showTemplatePicker ? 'var(--primary)' : undefined }}
-              >
-                <BookOpen size={18} />
-              </button>
-            )}
+            <button 
+              className="btn-icon" 
+              title="Load from template"
+              onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+              style={{ color: showTemplatePicker ? 'var(--primary)' : undefined }}
+            >
+              <BookOpen size={18} />
+            </button>
           </div>
         </div>
 
@@ -925,6 +1001,26 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                       <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>Guided Steps Playlist</label>
                       <button className="btn-text" onClick={addStep} style={{ fontSize: '0.8rem', padding: '0', color: 'var(--primary)' }}>+ Add Step</button>
                     </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginRight: '4px' }}>Quick Macro:</span>
+                      <select 
+                        style={{ flex: 1, padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', minWidth: '180px' }}
+                        value=""
+                        onChange={(e) => {
+                           if (!e.target.value) return;
+                           const stepToCopy = historicalSteps.find(s => s.id === e.target.value);
+                           if (stepToCopy) {
+                             const newStep = { ...stepToCopy, id: generateId() };
+                             setEditForm(prev => ({ ...prev, steps: [...prev.steps, newStep] }));
+                           }
+                        }}
+                      >
+                        <option value="">Seleziona uno step salvato...</option>
+                        {historicalSteps.map(s => (
+                          <option key={s.id} value={s.id}>{getStepMacroLabel(s)}</option>
+                        ))}
+                      </select>
+                    </div>
                     {editForm.steps.map((step, idx) => renderStepEditor(step, idx))}
                     {editForm.steps.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No guided steps. Timer will not be available for this exercise.</p>}
                   </div>
@@ -1005,9 +1101,9 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                         }}>
                           <span>Last: {last.date}</span>
                           {last.duration && <span>· {last.duration}</span>}
-                          {last.energy > 0 && <span>· E:{last.energy}</span>}
-                          {last.cardio > 0 && <span>C:{last.cardio}</span>}
-                          {last.intensity > 0 && <span>I:{last.intensity}</span>}
+                          {last.rpe > 0 && <span>· RPE:{last.rpe}</span>}
+                          {last.feelTags && last.feelTags.length > 0 && <span>· {last.feelTags.join(', ')}</span>}
+                          {last.headTags && last.headTags.length > 0 && <span>· {last.headTags.join(', ')}</span>}
                         </div>
                       );
                     })()}

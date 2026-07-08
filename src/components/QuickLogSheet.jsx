@@ -10,11 +10,9 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
   const durMinutes = calculateDuration(exercise, [], ''); // Default context
   const [durationStr, setDurationStr] = useState(durMinutes > 0 ? String(durMinutes) : '');
 
-  const [energy, setEnergy] = useState(7);
-  const [cardio, setCardio] = useState(7);
-  const [legs, setLegs] = useState(7);
-  const [intensity, setIntensity] = useState(7);
-  const [focus, setFocus] = useState(7);
+  const [rpe, setRpe] = useState(7); // Rate of Perceived Exertion (1-10)
+  const [feelTags, setFeelTags] = useState([]);
+  const [headTags, setHeadTags] = useState([]);
   
   const [distance, setDistance] = useState('');
   const [pace, setPace] = useState('');
@@ -40,11 +38,9 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
 
     onSave({
       duration: durationStr ? durationStr + ' min' : '',
-      energy,
-      cardio,
-      legs,
-      intensity,
-      focus,
+      rpe,
+      feelTags,
+      headTags,
       bodyMap: Object.keys(bodyMap).length > 0 ? bodyMap : undefined,
       sleepHours: sleepHours ? Number(sleepHours) : null,
       sleepQuality,
@@ -99,12 +95,42 @@ export function QuickLogSheet({ exercise, logs, onSave, onSkip, onCancel }) {
           />
         </div>
 
-        {/* Sliders */}
-        {renderSlider('Energia', energy, setEnergy)}
-        {renderSlider('Cardio', cardio, setCardio)}
-        {renderSlider('Gambe', legs, setLegs)}
-        {renderSlider('Intensità', intensity, setIntensity)}
-        {renderSlider('Focus Mentale', focus, setFocus)}
+        {/* RPE & Tags */}
+        <div style={{ marginBottom: '1.5rem', background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '0.75rem', padding: '0.75rem' }}>
+          {renderSlider('RPE (Sforzo Percepito)', rpe, setRpe)}
+          
+          <div style={{ ...labelStyle, marginTop: '1rem', color: 'var(--text-main)', fontWeight: 600 }}>Sensazione Fisica</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1rem' }}>
+            {['Fresco', 'Esplosivo', 'Leggero', 'Forte', 'Reattivo', 'Gambe pesanti', 'Fiato corto', 'Lento', 'Rigido', 'Spento', 'Dolorante', 'Nauseato'].map(t => (
+              <button
+                key={t}
+                onClick={() => setFeelTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                style={{
+                  padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '1rem', cursor: 'pointer',
+                  border: feelTags.includes(t) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                  background: feelTags.includes(t) ? 'var(--primary)' : 'transparent',
+                  color: feelTags.includes(t) ? 'white' : 'var(--text-muted)'
+                }}
+              >{t}</button>
+            ))}
+          </div>
+
+          <div style={{ ...labelStyle, color: 'var(--text-main)', fontWeight: 600 }}>Testa / Focus</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {['In flow', 'Motivato', 'Concentrato', 'Aggressivo', 'Tranquillo', 'Rilassato', 'Distratto', 'Svogliato', 'Ansioso', 'Nervoso', 'Stressato', 'Frustrato'].map(t => (
+              <button
+                key={t}
+                onClick={() => setHeadTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                style={{
+                  padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '1rem', cursor: 'pointer',
+                  border: headTags.includes(t) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                  background: headTags.includes(t) ? 'var(--primary)' : 'transparent',
+                  color: headTags.includes(t) ? 'white' : 'var(--text-muted)'
+                }}
+              >{t}</button>
+            ))}
+          </div>
+        </div>
 
         {exercise.type === 'Running' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>

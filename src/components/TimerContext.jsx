@@ -140,9 +140,13 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     // Re-init sequence parameters when workout is fresh or reset
     if (isGuided && phase === 'stopped' && currentStepIdx === 0) {
       plannedDuration.current = activeWorkout.steps.reduce((acc, step) => {
-        if (step.type === 'timer' || step.type === 'manual_timer') return acc + (step.duration || 0);
-        if (step.type === 'interval') return acc + (((step.work || 0) + (step.rest || 0)) * (step.rounds || 1));
+        // v6 types
+        if (step.type === 'timer') return acc + (step.duration || 0);
+        if (step.type === 'round') return acc + (((step.work || 0) + (step.rest || 0)) * (step.rounds || 1));
         if (step.type === 'sets') return acc + ((step.rest || 60) * (step.sets || 1));
+        // v5 legacy fallback
+        if (step.type === 'manual_timer') return acc + (step.duration || 0);
+        if (step.type === 'interval') return acc + (((step.work || 0) + (step.rest || 0)) * (step.rounds || 1));
         return acc;
       }, 0);
       statsTracker.current = { actualDuration: 0, lastActive: null };
@@ -249,14 +253,19 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   const handleGuidedTransition = () => {
     if (!currentStep) return;
 
-    if (currentStep.type === 'timer' || currentStep.type === 'manual_timer') {
-      if (phase === 'prep' && currentStep.type === 'timer') {
+    const isTimerStep = currentStep.type === 'timer' || currentStep.type === 'manual_timer';
+    const isAutoAdvance = currentStep.type === 'timer' ? currentStep.autoAdvance !== false : currentStep.type !== 'manual_timer';
+    const isRoundStep = currentStep.type === 'round' || currentStep.type === 'interval';
+    const isNoteStep = currentStep.type === 'note' || currentStep.type === 'text';
+
+    if (isTimerStep) {
+      if (phase === 'prep' && isAutoAdvance) {
         setPhase('work');
         setTimeLeft(currentStep.duration);
       } else {
         advanceGuidedStep();
       }
-    } else if (currentStep.type === 'interval') {
+    } else if (isRoundStep) {
       if (phase === 'prep') {
         setPhase('work');
         setTimeLeft(currentStep.work);
@@ -309,7 +318,11 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
       setCurrentStepIdx(prev => prev + 1);
       prepareGuidedStep(nextStep);
 
-      if (nextStep.type !== 'manual_timer' && nextStep.type !== 'sets' && nextStep.type !== 'text') {
+      // Auto-run for timed steps; stop for manual_timer (autoAdvance:false), sets, note
+      const isNextManual = nextStep.type === 'manual_timer' ||
+        (nextStep.type === 'timer' && nextStep.autoAdvance === false);
+      const isNextNote = nextStep.type === 'note' || nextStep.type === 'text';
+      if (!isNextManual && !isNextNote && nextStep.type !== 'sets') {
         const stepPrep = getStepPrepTime(nextStep);
         setTimeout(() => {
           setPhase('prep');
@@ -335,12 +348,13 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     setCurrentRound(1);
     delete timerRef.current.expectedEndTime;
 
+    const isRound = step.type === 'round' || step.type === 'interval';
     if (step.type === 'timer' || step.type === 'manual_timer') {
       setTimeLeft(step.duration);
-    } else if (step.type === 'interval') {
+    } else if (isRound) {
       setTimeLeft(getStepPrepTime(step));
-    } else if (step.type === 'sets') {
-      setTimeLeft(0);
+    } else {
+      setTimeLeft(0); // sets, note
     }
   };
 

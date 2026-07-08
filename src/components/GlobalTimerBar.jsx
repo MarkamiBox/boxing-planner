@@ -24,7 +24,7 @@ export function GlobalTimerBar({ activeTab, setActiveTab }) {
   // Or hide if fully stopped and not in guided mode
   if (phase === 'stopped' && !isGuided) return null;
   // If guided but stopped at the very beginning, maybe show minimal or hide
-  if (phase === 'stopped' && isGuided && currentStep && currentStep.type === 'text') return null;
+  if (phase === 'stopped' && isGuided && currentStep && (currentStep.type === 'text' || currentStep.type === 'note')) return null;
 
   const bg = getPhaseColor();
 
@@ -54,7 +54,7 @@ export function GlobalTimerBar({ activeTab, setActiveTab }) {
         <span style={{ fontSize: '0.75rem', color: bg, fontWeight: 'bold' }}>
           {getPhaseLabel()} {phase !== 'stopped' && phase !== 'prep' && (
             (!isGuided && `- RND ${currentRound}/${totalRounds}`) ||
-            (isGuided && currentStep?.type === 'interval' && `- RND ${currentRound}/${currentStep.rounds}`)
+            (isGuided && (currentStep?.type === 'interval' || currentStep?.type === 'round') && `- RND ${currentRound}/${currentStep.rounds}`)
           )}
         </span>
         <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
