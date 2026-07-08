@@ -134,3 +134,70 @@ export function timeToMinutes(hhmm) {
   const m = parseInt(match[2], 10);
   return (isNaN(h) || isNaN(m)) ? 0 : h * 60 + m;
 }
+
+export function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+}
+
+export function sanitizeExercise(ex, fallbackId) {
+  const cleanId = ex.id || fallbackId || generateId();
+  const s = {
+    id: cleanId,
+    type: ['Boxing', 'Strength', 'Running', 'Recovery'].includes(ex.type) ? ex.type : 'Boxing',
+    name: ex.name || 'Imported Exercise',
+    done: !!ex.done,
+    notes: ex.notes || '',
+    plannedTime: ex.plannedTime || '',
+    isCourse: !!ex.isCourse,
+    courseLocationId: ex.courseLocationId || '',
+    courseId: ex.courseId || '',
+    courseIdx: ex.courseIdx !== undefined ? ex.courseIdx : '',
+    steps: Array.isArray(ex.steps) ? ex.steps : []
+  };
+
+  s.steps = s.steps.map((step, idx) => {
+    const ss = {
+      id: step.id || generateId(),
+      type: ['timer', 'manual_timer', 'interval', 'sets', 'text'].includes(step.type) ? step.type : 'timer',
+      name: step.name || `Step ${idx + 1}`,
+      instruction: step.instruction || ''
+    };
+    
+    // Ensure numeric fields are valid
+    if (ss.type === 'timer' || ss.type === 'manual_timer') {
+      ss.duration = parseInt(step.duration) || 180;
+    } else if (ss.type === 'interval') {
+      ss.work = parseInt(step.work) || 180;
+      ss.rest = parseInt(step.rest) || 60;
+      ss.rounds = parseInt(step.rounds) || 3;
+    } else if (ss.type === 'sets') {
+      ss.sets = parseInt(step.sets) || 3;
+      ss.reps = step.reps || '10';
+      ss.rest = parseInt(step.rest) || 60;
+    } else if (ss.type === 'text') {
+      ss.duration = parseInt(step.duration) || 0;
+    }
+    
+    if (step.prepTime !== undefined) {
+      ss.prepTime = parseInt(step.prepTime);
+    }
+    
+    return ss;
+  });
+  return s;
+}
+
+export function sanitizeSchedule(parsed) {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('Invalid schedule structure');
+  }
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const sanitized = {};
+  daysOfWeek.forEach(day => {
+    const dayExercises = Array.isArray(parsed[day]) ? parsed[day] : [];
+    sanitized[day] = dayExercises.map((ex, i) => sanitizeExercise(ex, `import-w-${day}-${i}-${generateId()}`));
+  });
+  return sanitized;
+}
+

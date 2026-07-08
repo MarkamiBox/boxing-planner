@@ -2,16 +2,12 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Check, Edit2, Plus, Trash2, X, Save, Play, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileCode2, AlertCircle, Copy, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useDialog } from '../components/DialogContext';
 import { TimeInput } from '../components/TimeInput';
-import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime } from '../utils';
+import { getTodayDayName, getWeekId, calculateDuration, addMinutesToTime, generateId, sanitizeExercise, sanitizeSchedule } from '../utils';
 import { useAppState } from '../hooks/useAppState';
 import { QuickLogSheet } from '../components/QuickLogSheet';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
-};
 
 export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs, onDirtyStateChange, workoutTemplates, setWorkoutTemplates }) {
   const { showAlert, showConfirm } = useDialog();
@@ -108,41 +104,46 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       Object.keys(cloned).forEach(day => {
         cloned[day].forEach(ex => ex.done = false);
       });
-      setWeeks({ ...weeks, [newId]: cloned });
+      setWeeks(prev => ({ ...(prev || {}), [newId]: cloned }));
     }
     setCurrentWeekId(newId);
   };
 
   const toggleDone = (day, exerciseId) => {
-    const newSchedule = { ...schedule };
-    const ex = newSchedule[day].find(e => e.id === exerciseId);
-    if (ex) {
-      ex.done = !ex.done;
-      setSchedule(newSchedule);
+    const originalEx = schedule[day]?.find(e => e.id === exerciseId);
+    if (!originalEx) return;
 
-      const sessionOriginId = `${currentWeekId}-${day}-${exerciseId}`;
+    const newDoneState = !originalEx.done;
+    const newSchedule = {
+      ...schedule,
+      [day]: schedule[day].map(e => e.id === exerciseId ? { ...e, done: newDoneState } : e)
+    };
+    
+    setSchedule(newSchedule);
 
-      if (ex.done) {
-        const logId = generateId();
-        const exerciseSnapshot = JSON.parse(JSON.stringify(ex));
-        const initialLogData = {
-          ...exerciseSnapshot,
-          id: logId,
-          originId: sessionOriginId,
-          date: new Date().toISOString().split('T')[0],
-          weekId: currentWeekId,
-          energy: 0,
-          cardio: 0,
-          legs: 0,
-          intensity: 0,
-          focus: 0,
-          notes: exerciseSnapshot.notes || 'Sessione veloce dallo Schedule'
-        };
-        setQuickLogTarget({ exercise: ex, day, initialLogData });
-      } else {
-        // Se togli la spunta, elimina il log associato
-        setLogs(prev => prev.filter(l => l.originId === sessionOriginId ? false : true));
-      }
+    const sessionOriginId = `${currentWeekId}-${day}-${exerciseId}`;
+
+    if (newDoneState) {
+      const logId = generateId();
+      const exerciseSnapshot = JSON.parse(JSON.stringify(originalEx));
+      exerciseSnapshot.done = newDoneState;
+      const initialLogData = {
+        ...exerciseSnapshot,
+        id: logId,
+        originId: sessionOriginId,
+        date: new Date().toISOString().split('T')[0],
+        weekId: currentWeekId,
+        energy: 0,
+        cardio: 0,
+        legs: 0,
+        intensity: 0,
+        focus: 0,
+        notes: exerciseSnapshot.notes || 'Sessione veloce dallo Schedule'
+      };
+      setQuickLogTarget({ exercise: { ...originalEx, done: newDoneState }, day, initialLogData });
+    } else {
+      // Se togli la spunta, elimina il log associato
+      setLogs(prev => prev.filter(l => l.originId !== sessionOriginId));
     }
   };
 
@@ -162,24 +163,25 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   };
 
   const saveEdit = (day) => {
-    const newSchedule = { ...schedule };
-    const idx = newSchedule[day].findIndex(e => e.id === editingId);
-    if (idx > -1) {
-      newSchedule[day][idx] = { ...newSchedule[day][idx], ...editForm };
-      setSchedule(newSchedule);
-    }
+    const newSchedule = {
+      ...schedule,
+      [day]: schedule[day].map(e => e.id === editingId ? { ...e, ...editForm } : e)
+    };
+    setSchedule(newSchedule);
     setEditingId(null);
   };
 
   const deleteExercise = (day, exerciseId) => {
-    const exerciseToDelete = schedule[day].find(e => e.id === exerciseId);
-    const exerciseIdx = schedule[day].findIndex(e => e.id === exerciseId);
+    const exerciseToDelete = schedule[day]?.find(e => e.id === exerciseId);
+    const exerciseIdx = schedule[day]?.findIndex(e => e.id === exerciseId);
     if (!exerciseToDelete) return;
 
     setDeletedItem({ day, exercise: exerciseToDelete, index: exerciseIdx });
 
-    const newSchedule = { ...schedule };
-    newSchedule[day] = newSchedule[day].filter(e => e.id !== exerciseId);
+    const newSchedule = {
+      ...schedule,
+      [day]: schedule[day].filter(e => e.id !== exerciseId)
+    };
     setSchedule(newSchedule);
     setEditingId(null);
 
@@ -192,39 +194,44 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const undoDelete = () => {
     if (!deletedItem) return;
     const { day, exercise, index } = deletedItem;
-    const newSchedule = { ...schedule };
-    const arr = [...(newSchedule[day] || [])];
+    const arr = [...(schedule[day] || [])];
     arr.splice(index, 0, exercise);
-    newSchedule[day] = arr;
+    const newSchedule = {
+      ...schedule,
+      [day]: arr
+    };
     setSchedule(newSchedule);
     setDeletedItem(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   };
 
   const moveExercise = (day, idx, dir) => {
-    const newSchedule = { ...schedule };
-    const arr = [...newSchedule[day]];
+    const arr = [...(schedule[day] || [])];
     const target = idx + dir;
     if (target < 0 || target >= arr.length) return;
     [arr[idx], arr[target]] = [arr[target], arr[idx]];
-    newSchedule[day] = arr;
+    const newSchedule = {
+      ...schedule,
+      [day]: arr
+    };
     setSchedule(newSchedule);
   };
 
   const copyExerciseTo = (ex, targetDay) => {
-    const newSchedule = { ...schedule };
     const cloned = JSON.parse(JSON.stringify(ex));
     cloned.id = generateId();
     cloned.done = false;
-    newSchedule[targetDay] = [...(newSchedule[targetDay] || []), cloned];
+    const newSchedule = {
+      ...schedule,
+      [targetDay]: [...(schedule[targetDay] || []), cloned]
+    };
     setSchedule(newSchedule);
     setCopyPickerFor(null);
   };
 
   const addExercise = (day) => {
-    const newSchedule = { ...schedule };
     const newId = generateId();
-    newSchedule[day].push({
+    const newExercise = {
       id: newId,
       type: 'Boxing',
       name: 'New Exercise',
@@ -232,9 +239,13 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       notes: '',
       plannedTime: '',
       steps: []
-    });
+    };
+    const newSchedule = {
+      ...schedule,
+      [day]: [...(schedule[day] || []), newExercise]
+    };
     setSchedule(newSchedule);
-    startEdit({ id: newId, type: 'Boxing', name: 'New Exercise', notes: '', plannedTime: '', steps: [] });
+    startEdit(newExercise);
   };
 
   const handleCloneLastWeek = () => {
@@ -247,7 +258,6 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       const cloned = JSON.parse(JSON.stringify(prevSchedule));
       Object.keys(cloned).forEach(d => cloned[d].forEach(ex => ex.done = false));
       setSchedule(cloned);
-      setWeeks({ ...weeks, [currentWeekId]: cloned });
       showAlert('Successo', `Settimana ${prevWeekId} clonata con successo in ${currentWeekId}.`);
     } else {
       showAlert('Errore', `Nessuna programmazione trovata per la settimana ${prevWeekId}.`);
@@ -259,7 +269,6 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     showConfirm('Pulisci Settimana', "Sei sicuro di voler svuotare l'intera settimana?", () => {
       const blank = { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
       setSchedule(blank);
-      setWeeks({ ...weeks, [currentWeekId]: blank });
     });
     setCloneMenuOpen(false);
   };
@@ -276,68 +285,15 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       return;
     }
 
-    const sanitizeExercise = (ex, fallbackId) => {
-      const s = {
-        id: ex.id || fallbackId,
-        type: ['Boxing', 'Strength', 'Running', 'Recovery'].includes(ex.type) ? ex.type : 'Boxing',
-        name: ex.name || 'Imported Exercise',
-        done: !!ex.done,
-        notes: ex.notes || '',
-        plannedTime: ex.plannedTime || '',
-        isCourse: !!ex.isCourse,
-        courseLocationId: ex.courseLocationId || '',
-        courseId: ex.courseId || '',
-        courseIdx: ex.courseIdx !== undefined ? ex.courseIdx : '',
-        steps: Array.isArray(ex.steps) ? ex.steps : []
-      };
-
-      s.steps = s.steps.map((step, idx) => {
-        const ss = {
-          id: step.id || generateId(),
-          type: ['timer', 'manual_timer', 'interval', 'sets', 'text'].includes(step.type) ? step.type : 'timer',
-          name: step.name || `Step ${idx + 1}`,
-          instruction: step.instruction || ''
-        };
-        
-        // Ensure numeric fields are valid
-        if (ss.type === 'timer' || ss.type === 'manual_timer') {
-          ss.duration = parseInt(step.duration) || 180;
-        } else if (ss.type === 'interval') {
-          ss.work = parseInt(step.work) || 180;
-          ss.rest = parseInt(step.rest) || 60;
-          ss.rounds = parseInt(step.rounds) || 3;
-        } else if (ss.type === 'sets') {
-          ss.sets = parseInt(step.sets) || 3;
-          ss.reps = step.reps || '10';
-          ss.rest = parseInt(step.rest) || 60;
-        }
-        
-        if (step.prepTime !== undefined) {
-          ss.prepTime = parseInt(step.prepTime);
-        }
-        
-        return ss;
-      });
-      return s;
-    };
-
     if (jsonImport.mode === 'week') {
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-        setJsonImport(s => ({ ...s, error: 'Per l\'import settimanale serve un oggetto con i giorni (monday, tuesday...).' }));
-        return;
+      try {
+        const sanitizedWeek = sanitizeSchedule(parsed);
+        setSchedule(sanitizedWeek);
+        closeJsonImport();
+        showAlert('Successo', 'Settimana importata e sanitizzata correttamente!');
+      } catch (err) {
+        setJsonImport(s => ({ ...s, error: err.message || 'Errore durante la sanitizzazione della settimana.' }));
       }
-      
-      const sanitizedWeek = {};
-      daysOfWeek.forEach(day => {
-        const dayExercises = Array.isArray(parsed[day]) ? parsed[day] : [];
-        sanitizedWeek[day] = dayExercises.map((ex, i) => sanitizeExercise(ex, `import-w-${day}-${i}-${generateId()}`));
-      });
-
-      const newWeeks = { ...weeks, [currentWeekId]: sanitizedWeek };
-      setWeeks(newWeeks);
-      setSchedule(sanitizedWeek);
-      closeJsonImport();
-      showAlert('Successo', 'Settimana importata e sanitizzata correttamente!');
       return;
     }
 
@@ -345,8 +301,10 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     const rawExercises = Array.isArray(parsed) ? parsed : [parsed];
     const normalised = rawExercises.map((e, i) => sanitizeExercise(e, `import-d-${generateId()}-${i}`));
 
-    const newSchedule = { ...schedule };
-    newSchedule[activeDay] = [...(newSchedule[activeDay] || []), ...normalised];
+    const newSchedule = {
+      ...schedule,
+      [activeDay]: [...(schedule[activeDay] || []), ...normalised]
+    };
     setSchedule(newSchedule);
     closeJsonImport();
     showAlert('Import OK', `${ normalised.length } esercizio / i aggiunto / i a ${ activeDay.charAt(0).toUpperCase() + activeDay.slice(1) }.`);
@@ -1083,10 +1041,13 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
             setQuickLogTarget(null);
           }}
           onCancel={() => {
-            const undoSchedule = { ...schedule };
-            const undoEx = undoSchedule[quickLogTarget.day]?.find(e => e.id === quickLogTarget.exercise.id);
-            if (undoEx) undoEx.done = false;
-            setSchedule(undoSchedule);
+            const day = quickLogTarget.day;
+            const exId = quickLogTarget.exercise.id;
+            const newSchedule = {
+              ...schedule,
+              [day]: schedule[day].map(e => e.id === exId ? { ...e, done: false } : e)
+            };
+            setSchedule(newSchedule);
             setQuickLogTarget(null);
           }}
         />

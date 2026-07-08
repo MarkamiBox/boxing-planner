@@ -45,6 +45,9 @@ Coaches can distribute JSON strings like this to athletes:
 ```
 Simply paste this using the import modal in the Schedule View to populate the training day instantly.
 
-## Privacy
+## Privacy & Security
 
 This is a "Vibe-Coded" application built on the principle of **Local-First Software**. Your training logs, AI Coach conversations, and personal biometric data never leave your device. All LLM integrations are handled via direct API calls using your own keys, ensuring no middleman ever sees your data.
+
+> [!WARNING]
+> **API Keys Security**: API keys (`coachSettings.apiKey`, `anthropicKey`, etc.) are saved in clear text in IndexedDB on your local browser database, following the local-first philosophy. If the device or browser profile is shared with other people, they could theoretically inspect the storage and access these keys. Protect your device and use a private browser profile if you share your machine.

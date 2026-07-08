@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, CheckCircle, Trash2, Edit2, X, ChevronDown, ChevronUp, Award, Brain, StickyNote } from 'lucide-react';
 import { calculateDuration } from '../utils';
 import { BodyDummy } from '../components/BodyDummy';
 import './logger.css';
+import { useIdbStorage } from '../hooks/useAppState';
 
 export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWorkout, schedule, setSchedule, setActiveTab, setPendingCoachContext, sessionNotes, clearSessionNotes }) {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -31,9 +32,11 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
 
   useEffect(() => {
     if (sessionNotes && sessionNotes.length > 0 && !combinedSessionNotes) {
-      setCombinedSessionNotes(sessionNotes.map(n => n.raw).join('\n'));
+      setTimeout(() => {
+        setCombinedSessionNotes(sessionNotes.map(n => n.raw).join('\n'));
+      }, 0);
     }
-  }, [sessionNotes]);
+  }, [sessionNotes, combinedSessionNotes]);
 
   // Running specific
   const [distance, setDistance] = useState('');
@@ -63,54 +66,58 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
   // Sync if activeWorkout changes
   useEffect(() => {
     if (activeWorkout) {
-      setType(activeWorkout.type);
-      setNotes(`Completed: ${activeWorkout.name}`);
-      setDurationStr(String(calculateDuration(activeWorkout, profile?.locations || [], activeWorkout.sourceDay || '')));
+      setTimeout(() => {
+        setType(activeWorkout.type);
+        setNotes(`Completed: ${activeWorkout.name}`);
+        setDurationStr(String(calculateDuration(activeWorkout, profile?.locations || [], activeWorkout.sourceDay || '')));
+      }, 0);
     }
-  }, [activeWorkout]);
+  }, [activeWorkout, profile?.locations]);
 
   // Draft Persistence Logic
-  const DRAFT_KEY = 'bxng_log_draft';
+  const [savedDraft, setSavedDraft, resetSavedDraft] = useIdbStorage('bxng_log_draft', null);
+  const hasRestoredDraft = useRef(false);
   
   useEffect(() => {
-    try {
-      const savedDraft = window.localStorage.getItem(DRAFT_KEY);
-      if (savedDraft && !activeWorkout) {
-        const d = JSON.parse(savedDraft);
-        if (d.date) setDate(d.date);
-        if (d.type) setType(d.type);
-        if (d.timeOfDay) setTimeOfDay(d.timeOfDay);
-        if (d.durationStr) setDurationStr(d.durationStr);
-        if (d.energy) setEnergy(d.energy);
-        if (d.cardio) setCardio(d.cardio);
-        if (d.legs) setLegs(d.legs);
-        if (d.intensity) setIntensity(d.intensity);
-        if (d.focus) setFocus(d.focus);
-        if (d.notes) setNotes(d.notes);
-        if (d.distance) setDistance(d.distance);
-        if (d.pace) setPace(d.pace);
-        if (d.time) setTime(d.time);
-        if (d.sparringRounds) setSparringRounds(d.sparringRounds);
-        if (d.lastRoundDrop) setLastRoundDrop(d.lastRoundDrop);
-        if (d.bodyWeight) setBodyWeight(d.bodyWeight);
-        if (d.sleepHours) setSleepHours(d.sleepHours);
-        if (d.sleepQuality) setSleepQuality(d.sleepQuality);
-        if (d.bodyMap) setBodyMap(d.bodyMap);
-      }
-    } catch (e) { console.error("Restore draft failed", e); }
-  }, []);
+    if (savedDraft && !activeWorkout && !hasRestoredDraft.current) {
+      hasRestoredDraft.current = true;
+      const d = savedDraft;
+      setTimeout(() => {
+        if (d.date !== undefined) setDate(d.date);
+        if (d.type !== undefined) setType(d.type);
+        if (d.timeOfDay !== undefined) setTimeOfDay(d.timeOfDay);
+        if (d.durationStr !== undefined) setDurationStr(d.durationStr);
+        if (d.energy !== undefined) setEnergy(d.energy);
+        if (d.cardio !== undefined) setCardio(d.cardio);
+        if (d.legs !== undefined) setLegs(d.legs);
+        if (d.intensity !== undefined) setIntensity(d.intensity);
+        if (d.focus !== undefined) setFocus(d.focus);
+        if (d.notes !== undefined) setNotes(d.notes);
+        if (d.distance !== undefined) setDistance(d.distance);
+        if (d.pace !== undefined) setPace(d.pace);
+        if (d.time !== undefined) setTime(d.time);
+        if (d.sparringRounds !== undefined) setSparringRounds(d.sparringRounds);
+        if (d.lastRoundDrop !== undefined) setLastRoundDrop(d.lastRoundDrop);
+        if (d.bodyWeight !== undefined) setBodyWeight(d.bodyWeight);
+        if (d.sleepHours !== undefined) setSleepHours(d.sleepHours);
+        if (d.sleepQuality !== undefined) setSleepQuality(d.sleepQuality);
+        if (d.bodyMap !== undefined) setBodyMap(d.bodyMap);
+      }, 0);
+    }
+  }, [savedDraft, activeWorkout]);
 
   useEffect(() => {
+    if (activeWorkout) return;
     const timer = setTimeout(() => {
       const draft = {
         date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus,
         notes, distance, pace, time, sparringRounds, lastRoundDrop,
         bodyWeight, sleepHours, sleepQuality, bodyMap
       };
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      setSavedDraft(draft);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus, notes, distance, pace, time, sparringRounds, lastRoundDrop, bodyWeight, sleepHours, sleepQuality, bodyMap]);
+  }, [date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus, notes, distance, pace, time, sparringRounds, lastRoundDrop, bodyWeight, sleepHours, sleepQuality, bodyMap, setSavedDraft, activeWorkout]);
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -170,7 +177,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
     }
 
     if (activeWorkout && setActiveWorkout) setActiveWorkout(null);
-    window.localStorage.removeItem(DRAFT_KEY);
+    resetSavedDraft();
     setSavedMessage(true);
     setTimeout(() => {
       setSavedMessage(false);
@@ -209,7 +216,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
     setEditDraft(null);
   };
 
-  const renderSlider = (label, value, setter) => (
+  const RenderSlider = (label, value, setter) => (
     <div className="slider-group">
       <div className="slider-header">
         <label>{label}</label>

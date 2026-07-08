@@ -149,13 +149,101 @@ function AppContent() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: '2rem',
+          maxWidth: '500px',
+          margin: '4rem auto',
+          background: 'var(--surface, #1e1e1e)',
+          color: 'var(--text-main, #ffffff)',
+          border: '1px solid var(--border-color, #333)',
+          borderRadius: '8px',
+          fontFamily: 'sans-serif',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+        }}>
+          <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>Si è verificato un errore</h2>
+          <p style={{ color: 'var(--text-muted, #aaa)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            L'applicazione ha riscontrato un problema imprevisto. Puoi provare a ricaricare la pagina o a resettare i dati.
+          </p>
+          <pre style={{
+            background: 'rgba(0,0,0,0.3)',
+            padding: '1rem',
+            borderRadius: '4px',
+            textAlign: 'left',
+            overflowX: 'auto',
+            fontSize: '0.8rem',
+            color: '#f87171',
+            marginBottom: '1.5rem'
+          }}>
+            {this.state.error?.toString()}
+          </pre>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: 'var(--primary, #10b981)',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Ricarica Pagina
+            </button>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                import('idb-keyval').then(idb => idb.clear()).then(() => window.location.reload());
+              }}
+              style={{
+                background: 'transparent',
+                color: '#ef4444',
+                border: '1px solid #ef4444',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Resetta Dati (Clear Storage)
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
-    <DialogProvider>
-      <AppStateProvider>
-        <AppContent />
-      </AppStateProvider>
-    </DialogProvider>
+    <ErrorBoundary>
+      <DialogProvider>
+        <AppStateProvider>
+          <AppContent />
+        </AppStateProvider>
+      </DialogProvider>
+    </ErrorBoundary>
   );
 }
 

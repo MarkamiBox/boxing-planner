@@ -6,6 +6,7 @@ import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
 import { AvailabilityCalendar } from '../components/AvailabilityCalendar';
+import { sanitizeSchedule } from '../utils';
 
 export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals, availability, setAvailability, availabilityTemplate, setAvailabilityTemplate }) {
   // Hook usage moved down to line 16 for additional features
@@ -283,28 +284,41 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
   const handleImportJSON = (text) => {
     try {
       const importedSchedule = JSON.parse(text);
-      if (importedSchedule.monday && importedSchedule.sunday) {
-        setSchedule(importedSchedule);
-        showAlert("Success", "Schedule imported into the current week successfully!");
+      const hasSomeDay = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].some(day => day in importedSchedule);
+      if (hasSomeDay) {
+        const sanitized = sanitizeSchedule(importedSchedule);
+        setSchedule(sanitized);
+        showAlert("Success", "Schedule imported and sanitized successfully!");
       } else {
-        showAlert("Error", "Invalid JSON structure for schedule.");
+        showAlert("Error", "Invalid JSON structure for schedule. Must contain days of the week.");
       }
     } catch (err) {
-      showAlert("Error", "Error parsing JSON.");
+      showAlert("Error", err.message || "Error parsing or validating JSON.");
     }
   };
 
   const handleExportAccount = async () => {
     const data = {};
-    const allKeys = await idbKeys();
-    for (const key of allKeys) {
-      if (key && key.startsWith('bxng_')) {
-        try {
-          data[key] = await get(key);
-        } catch (e) { }
+    const failedKeys = [];
+    try {
+      const allKeys = await idbKeys();
+      for (const key of allKeys) {
+        if (key && key.startsWith('bxng_')) {
+          try {
+            data[key] = await get(key);
+          } catch (e) {
+            console.error(`Failed to export key ${key}`, e);
+            failedKeys.push(key);
+          }
+        }
       }
+      if (failedKeys.length > 0) {
+        showAlert("Warning", `Alcune chiavi non sono state caricate nel backup a causa di errori del database: ${failedKeys.join(', ')}. Il backup potrebbe essere incompleto.`);
+      }
+      handleExportWithChoice("Full Account", data, "boxing_planner_backup");
+    } catch (err) {
+      showAlert("Error", `Errore durante l'esportazione dell'account: ${err.message || String(err)}`);
     }
-    handleExportWithChoice("Full Account", data, "boxing_planner_backup");
   };
 
   const handleImportAccount = (text) => {
