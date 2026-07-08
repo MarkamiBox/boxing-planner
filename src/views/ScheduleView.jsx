@@ -53,7 +53,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const undoTimerRef = useRef(null);
   const weekUndoTimerRef = useRef(null);
   const quickAddInputRef = useRef(null);
-  const [selectedMacroId, setSelectedMacroId] = useState("");
+  const [selectedMacroIds, setSelectedMacroIds] = useState([]);
+  const [isMacroListOpen, setIsMacroListOpen] = useState(false);
   
   useEffect(() => {
     onDirtyStateChange?.(editingId !== null);
@@ -1030,60 +1031,98 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                       <button className="btn-text" onClick={addStep} style={{ fontSize: '0.8rem', padding: '0', color: 'var(--primary)' }}>+ Add Step</button>
                     </div>
                     <div style={{ marginBottom: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginRight: '4px' }}>Quick Macro:</span>
-                        <select 
-                          style={{ flex: 1, padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', minWidth: '180px' }}
-                          value={selectedMacroId}
-                          onChange={(e) => setSelectedMacroId(e.target.value)}
-                        >
-                          <option value="">Seleziona uno step salvato...</option>
-                          {historicalSteps.map(s => (
-                            <option key={s.originalKey} value={s.originalKey}>{getStepMacroLabel(s)}</option>
-                          ))}
-                        </select>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>Quick Macro:</span>
+                        
+                        <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                          <button
+                            className="btn-text"
+                            style={{ width: '100%', textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--border-color)', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                            onClick={() => setIsMacroListOpen(!isMacroListOpen)}
+                          >
+                            <span>Seleziona macro salvate ({selectedMacroIds.length})</span>
+                            <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />
+                          </button>
+                          
+                          {isMacroListOpen && (
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '250px', overflowY: 'auto', marginTop: '4px' }}>
+                              {historicalSteps.map(s => (
+                                <div key={s.originalKey} style={{ display: 'flex', alignItems: 'center', padding: '0.4rem 0.6rem', borderBottom: '1px solid var(--border-color)' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedMacroIds.includes(s.originalKey)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
+                                      else setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
+                                    }}
+                                    style={{ width: 'auto', flex: '0 0 auto', marginRight: '8px', cursor: 'pointer' }}
+                                  />
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', flex: 1, cursor: 'pointer' }} onClick={() => {
+                                    if (selectedMacroIds.includes(s.originalKey)) setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
+                                    else setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
+                                  }}>{getStepMacroLabel(s)}</span>
+                                </div>
+                              ))}
+                              {historicalSteps.length === 0 && (
+                                <div style={{ padding: '0.6rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nessuna macro salvata.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                         <button 
                           className="btn-primary" 
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
-                          disabled={!selectedMacroId}
+                          style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
+                          disabled={selectedMacroIds.length === 0}
                           onClick={() => {
-                            const stepToCopy = historicalSteps.find(s => s.originalKey === selectedMacroId);
-                            if (stepToCopy) {
-                              const newStep = { ...stepToCopy, id: generateId() };
-                              setEditForm(prev => ({ ...prev, steps: [...prev.steps, newStep] }));
-                              setSelectedMacroId('');
+                            const newSteps = [];
+                            selectedMacroIds.forEach(id => {
+                              const stepToCopy = historicalSteps.find(s => s.originalKey === id);
+                              if (stepToCopy) newSteps.push({ ...stepToCopy, id: generateId() });
+                            });
+                            if (newSteps.length > 0) {
+                              setEditForm(prev => ({ ...prev, steps: [...prev.steps, ...newSteps] }));
+                              setSelectedMacroIds([]);
+                              setIsMacroListOpen(false);
                             }
                           }}
                         >
                           <Plus size={16} /> Aggiungi
                         </button>
-                        {selectedMacroId && !historicalSteps.find(s => s.originalKey === selectedMacroId)?._isDefault && (
-                          <button 
-                            className="btn-icon danger" 
-                            title="Nascondi questa macro"
-                            onClick={() => {
-                              hideMacro(selectedMacroId);
-                              setSelectedMacroId('');
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
                       </div>
                       
-                      {selectedMacroId && (() => {
-                        const s = historicalSteps.find(st => st.originalKey === selectedMacroId);
-                        if (!s) return null;
-                        return (
-                          <div style={{ marginTop: '0.5rem', padding: '0.6rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '2px' }}>Preview: {s.name}</div>
-                            {s.type === 'round' && <div>Round: {s.rounds}x ({Math.round(s.work/60)}' lav / {Math.round(s.rest/60)}' rip)</div>}
-                            {(s.type === 'timer' || s.type === 'manual_timer') && <div>Timer: {Math.round(s.duration/60)} minuti</div>}
-                            {s.type === 'sets' && <div>Sets: {s.sets}x {s.reps} (rec {s.rest}s)</div>}
-                            {s.instruction && <div style={{ marginTop: '4px', fontStyle: 'italic', opacity: 0.8 }}>"{s.instruction}"</div>}
-                          </div>
-                        );
-                      })()}
+                      {selectedMacroIds.length > 0 && (
+                        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {selectedMacroIds.map(id => {
+                            const s = historicalSteps.find(st => st.originalKey === id);
+                            if (!s) return null;
+                            return (
+                              <div key={id} style={{ padding: '0.4rem 0.6rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{s.name}</div>
+                                  {!s._isDefault && (
+                                    <button 
+                                      className="btn-icon danger" 
+                                      style={{ padding: '2px' }}
+                                      title="Nascondi questa macro"
+                                      onClick={() => {
+                                        hideMacro(s.originalKey);
+                                        setSelectedMacroIds(selectedMacroIds.filter(mid => mid !== s.originalKey));
+                                      }}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                                {s.type === 'round' && <div>Round: {s.rounds}x ({Math.round(s.work/60)}' lav / {Math.round(s.rest/60)}' rip)</div>}
+                                {(s.type === 'timer' || s.type === 'manual_timer') && <div>Timer: {Math.round(s.duration/60)} minuti</div>}
+                                {s.type === 'sets' && <div>Sets: {s.sets}x {s.reps} (rec {s.rest}s)</div>}
+                                {s.instruction && <div style={{ marginTop: '2px', fontStyle: 'italic', opacity: 0.8 }}>"{s.instruction}"</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     {editForm.steps.map((step, idx) => renderStepEditor(step, idx))}
                     {editForm.steps.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No guided steps. Timer will not be available for this exercise.</p>}
