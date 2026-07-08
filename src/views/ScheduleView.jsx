@@ -52,6 +52,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const [weekUndoItem, setWeekUndoItem] = useState(null); // { weekId, prevSchedule, label }
   const undoTimerRef = useRef(null);
   const weekUndoTimerRef = useRef(null);
+  const quickAddInputRef = useRef(null);
+  const [selectedMacroId, setSelectedMacroId] = useState("");
   
   useEffect(() => {
     onDirtyStateChange?.(editingId !== null);
@@ -71,16 +73,29 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     });
     return map;
   }, [logs]);
+  const [hiddenMacros, setHiddenMacros] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('hiddenMacros')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const hideMacro = (macroKey) => {
+    const newHidden = [...hiddenMacros, macroKey];
+    setHiddenMacros(newHidden);
+    localStorage.setItem('hiddenMacros', JSON.stringify(newHidden));
+  };
 
   const historicalSteps = useMemo(() => {
     const stepsMap = new Map();
     // Default macros that are always available
     const defaults = [
-      { id: 'def-warmup', type: 'timer', autoAdvance: true, name: 'Riscaldamento', duration: 600, instruction: '', _isDefault: true },
-      { id: 'def-3rnd', type: 'round', name: '3 Rnd (3/1)', work: 180, rest: 60, rounds: 3, instruction: ' | | ', _isDefault: true },
-      { id: 'def-tabata', type: 'round', name: 'Tabata', work: 20, rest: 10, rounds: 8, instruction: ' | | | | | | | ', _isDefault: true }
+      { id: 'def-warmup', type: 'timer', autoAdvance: true, name: 'Riscaldamento', duration: 600, instruction: '', _isDefault: true, parentType: 'Other' },
+      { id: 'def-3rnd', type: 'round', name: '3 Rnd (3/1)', work: 180, rest: 60, rounds: 3, instruction: ' | | ', _isDefault: true, parentType: 'Boxing' },
+      { id: 'def-tabata', type: 'round', name: 'Tabata', work: 20, rest: 10, rounds: 8, instruction: ' | | | | | | | ', _isDefault: true, parentType: 'Other' }
     ];
-    defaults.forEach(d => stepsMap.set(d.name.toLowerCase(), d));
+    defaults.forEach(d => stepsMap.set(d.name.toLowerCase(), { ...d, originalKey: d.name.toLowerCase() }));
 
     if (weeks) {
       Object.values(weeks).forEach(weekData => {
@@ -92,8 +107,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
               ex.steps.forEach(step => {
                 if (step.name && step.name.trim() !== 'New Step') {
                   const key = step.name.trim().toLowerCase();
-                  if (!stepsMap.has(key)) {
-                    stepsMap.set(key, { ...step, id: generateId(), _isDefault: false });
+                  if (!stepsMap.has(key) && !hiddenMacros.includes(key)) {
+                    stepsMap.set(key, { ...step, originalKey: key, _isDefault: false, parentType: ex.type });
                   }
                 }
               });
@@ -107,7 +122,19 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       if (a._isDefault !== b._isDefault) return a._isDefault ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-  }, [weeks]);
+  }, [weeks, hiddenMacros]);
+
+  const getExerciseIcon = (type) => {
+    switch (type) {
+      case 'Boxing': return '🥊';
+      case 'Running': return '🏃';
+      case 'Gym':
+      case 'Strength': return '🏋️';
+      case 'Stretching': return '🧘';
+      case 'Recovery': return '🛌';
+      default: return '📋';
+    }
+  };
 
   const getStepMacroLabel = (s) => {
     let details = '';
@@ -116,7 +143,8 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     else if (s.type === 'sets') details = `${s.sets||1} set`;
     else if (s.type === 'note' || s.type === 'text') details = `testo`;
     
-    return `${s._isDefault ? '🤖' : '👤'} ${s.name} (${details})`;
+    const icon = getExerciseIcon(s.parentType || 'Other');
+    return `${s._isDefault ? '🤖' : '👤'} ${icon} ${s.name} (${details})`;
   };
 
   // Swipe gesture tracking
@@ -1001,25 +1029,61 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                       <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>Guided Steps Playlist</label>
                       <button className="btn-text" onClick={addStep} style={{ fontSize: '0.8rem', padding: '0', color: 'var(--primary)' }}>+ Add Step</button>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginRight: '4px' }}>Quick Macro:</span>
-                      <select 
-                        style={{ flex: 1, padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', minWidth: '180px' }}
-                        value=""
-                        onChange={(e) => {
-                           if (!e.target.value) return;
-                           const stepToCopy = historicalSteps.find(s => s.id === e.target.value);
-                           if (stepToCopy) {
-                             const newStep = { ...stepToCopy, id: generateId() };
-                             setEditForm(prev => ({ ...prev, steps: [...prev.steps, newStep] }));
-                           }
-                        }}
-                      >
-                        <option value="">Seleziona uno step salvato...</option>
-                        {historicalSteps.map(s => (
-                          <option key={s.id} value={s.id}>{getStepMacroLabel(s)}</option>
-                        ))}
-                      </select>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginRight: '4px' }}>Quick Macro:</span>
+                        <select 
+                          style={{ flex: 1, padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', minWidth: '180px' }}
+                          value={selectedMacroId}
+                          onChange={(e) => setSelectedMacroId(e.target.value)}
+                        >
+                          <option value="">Seleziona uno step salvato...</option>
+                          {historicalSteps.map(s => (
+                            <option key={s.originalKey} value={s.originalKey}>{getStepMacroLabel(s)}</option>
+                          ))}
+                        </select>
+                        <button 
+                          className="btn-primary" 
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                          disabled={!selectedMacroId}
+                          onClick={() => {
+                            const stepToCopy = historicalSteps.find(s => s.originalKey === selectedMacroId);
+                            if (stepToCopy) {
+                              const newStep = { ...stepToCopy, id: generateId() };
+                              setEditForm(prev => ({ ...prev, steps: [...prev.steps, newStep] }));
+                              setSelectedMacroId('');
+                            }
+                          }}
+                        >
+                          <Plus size={16} /> Aggiungi
+                        </button>
+                        {selectedMacroId && !historicalSteps.find(s => s.originalKey === selectedMacroId)?._isDefault && (
+                          <button 
+                            className="btn-icon danger" 
+                            title="Nascondi questa macro"
+                            onClick={() => {
+                              hideMacro(selectedMacroId);
+                              setSelectedMacroId('');
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                      
+                      {selectedMacroId && (() => {
+                        const s = historicalSteps.find(st => st.originalKey === selectedMacroId);
+                        if (!s) return null;
+                        return (
+                          <div style={{ marginTop: '0.5rem', padding: '0.6rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '2px' }}>Preview: {s.name}</div>
+                            {s.type === 'round' && <div>Round: {s.rounds}x ({Math.round(s.work/60)}' lav / {Math.round(s.rest/60)}' rip)</div>}
+                            {(s.type === 'timer' || s.type === 'manual_timer') && <div>Timer: {Math.round(s.duration/60)} minuti</div>}
+                            {s.type === 'sets' && <div>Sets: {s.sets}x {s.reps} (rec {s.rest}s)</div>}
+                            {s.instruction && <div style={{ marginTop: '4px', fontStyle: 'italic', opacity: 0.8 }}>"{s.instruction}"</div>}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {editForm.steps.map((step, idx) => renderStepEditor(step, idx))}
                     {editForm.steps.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No guided steps. Timer will not be available for this exercise.</p>}
