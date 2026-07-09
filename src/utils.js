@@ -222,3 +222,17 @@ export function sanitizeSchedule(parsed) {
   return sanitized;
 }
 
+export function getEffortScore(log) {
+  if (!log) return 0;
+  if (log.rpe !== undefined && log.rpe > 0) return log.rpe;
+  if (log.energy !== undefined && log.energy > 0) return 10 - log.energy;
+  return 0;
+}
+
+export function getLogSoreness(log) {
+  if (!log) return 0;
+  if (log.musclesSoreness !== undefined && log.musclesSoreness !== null) return log.musclesSoreness;
+  if (!log.bodyMap || Object.keys(log.bodyMap).length === 0) return 0;
+  return Math.max(0, ...Object.values(log.bodyMap).map(b => b.intensity || 0));
+}
+

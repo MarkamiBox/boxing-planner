@@ -6,7 +6,7 @@ import './profile.css';
 import { useAppState } from '../hooks/useAppState';
 import { useDialog } from '../components/DialogContext';
 import { AvailabilityCalendar } from '../components/AvailabilityCalendar';
-import { sanitizeSchedule } from '../utils';
+import { sanitizeSchedule, getLogSoreness, getEffortScore } from '../utils';
 
 export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoals, availability, setAvailability, availabilityTemplate, setAvailabilityTemplate }) {
   // Hook usage moved down to line 16 for additional features
@@ -353,15 +353,13 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
 
     // Compute trends
     const avgRpe = recentFull.length > 0
-      ? (recentFull.reduce((a, l) => a + (l.rpe || (l.energy ? 10 - l.energy : 0)), 0) / recentFull.length).toFixed(1)
+      ? (recentFull.reduce((a, l) => a + getEffortScore(l), 0) / recentFull.length).toFixed(1)
       : '-';
     const avgSleep = withSleep.length > 0
       ? (withSleep.slice(0, 7).reduce((a, l) => a + l.sleepHours, 0) / Math.min(withSleep.length, 7)).toFixed(1)
       : null;
     const lastWeight = withWeight.length > 0 ? withWeight[0].bodyWeight : null;
-    const lastSoreness = recentFull.length > 0 && recentFull[0].musclesSoreness
-      ? recentFull[0].musclesSoreness
-      : null;
+    const lastSoreness = recentFull.length > 0 ? getLogSoreness(recentFull[0]) : null;
 
     // Days since last session
     const lastSessionDate = recentFull.length > 0 ? recentFull[0].date : null;
@@ -420,7 +418,8 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       text += `Duration: ${lastBoxing.duration || '-'}\n`;
       text += `Sparring rounds: ${lastBoxing.sparringRounds || 0}\n`;
       if (lastBoxing.sparringRounds > 0) text += `End-of-session performance drop: ${lastBoxing.lastRoundDrop}/10 ${lastBoxing.lastRoundDrop < 5 ? '(significant gas tank issue)' : ''}\n`;
-      text += `RPE: ${lastBoxing.rpe || (lastBoxing.energy ? 10 - lastBoxing.energy : '-')}/10\n`;
+      const boxingRpe = getEffortScore(lastBoxing);
+      text += `RPE: ${boxingRpe > 0 ? boxingRpe : '-'}/10\n`;
       if (lastBoxing.notes) text += `Notes: "${lastBoxing.notes}"\n`;
       text += '\n';
     }
@@ -429,7 +428,8 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       text += `🏃 LAST RUNNING SESSION (${lastRunning.date})\n`;
       text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       text += `Distance: ${lastRunning.distance || '-'} | Time: ${lastRunning.time || '-'} | Pace: ${lastRunning.pace || '-'}\n`;
-      text += `RPE: ${lastRunning.rpe || (lastRunning.energy ? 10 - lastRunning.energy : '-')}/10\n\n`;
+      const runningRpe = getEffortScore(lastRunning);
+      text += `RPE: ${runningRpe > 0 ? runningRpe : '-'}/10\n\n`;
     }
 
     // ── SESSION HISTORY ───────────────────────────────────────────────────────────

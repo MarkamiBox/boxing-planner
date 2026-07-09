@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts';
 import { Trash2, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
-import { getWeekId } from '../utils';
+import { getWeekId, getEffortScore } from '../utils';
 import { useDialog } from '../components/DialogContext';
 import { BodyDummy, getWeightedIntensity, getSorenessColor } from '../components/BodyDummy';
 import './stats.css';
@@ -56,7 +56,7 @@ export function StatsView({ logs, setLogs }) {
   // ─── Performance Trend (per-session) ─────────────────────────────────────────
   const trendData = useMemo(() => [...logs].reverse().filter(l => l.rpe > 0 || l.energy > 0).map(log => ({
     date: log.date.substring(5),
-    rpe: log.rpe || (log.energy ? 10 - log.energy : 0),
+    rpe: getEffortScore(log),
     energy: log.energy,
     cardio: log.cardio,
     legs: log.legs,
@@ -98,7 +98,7 @@ export function StatsView({ logs, setLogs }) {
       if (!typeStats[log.type]) typeStats[log.type] = { count: 0, rpe: 0 };
       const t = typeStats[log.type];
       t.count++;
-      t.rpe += log.rpe || (log.energy ? 10 - log.energy : 0);
+      t.rpe += getEffortScore(log);
     });
     return Object.entries(typeStats).map(([type, s]) => ({
       type,
@@ -111,8 +111,8 @@ export function StatsView({ logs, setLogs }) {
   const validLogs = logs.filter(l => l.rpe > 0 || l.energy > 0);
   const pr = {
     highestRpe: validLogs.reduce((best, l) => {
-      const currentRpe = l.rpe || (l.energy ? 10 - l.energy : 0);
-      const bestRpe = best?.rpe || (best?.energy ? 10 - best.energy : 0);
+      const currentRpe = getEffortScore(l);
+      const bestRpe = getEffortScore(best);
       return currentRpe > bestRpe ? l : best;
     }, null),
     mostRounds: logs.filter(l => l.sparringRounds > 0).reduce((best, l) => l.sparringRounds > (best?.sparringRounds || 0) ? l : best, null),
@@ -514,7 +514,7 @@ export function StatsView({ logs, setLogs }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {[
-                { label: 'Highest RPE (Max Effort)', icon: '🔥', log: pr.highestRpe, value: pr.highestRpe ? (pr.highestRpe.rpe || (pr.highestRpe.energy ? 10 - pr.highestRpe.energy : 0)) : null },
+                { label: 'Highest RPE (Max Effort)', icon: '🔥', log: pr.highestRpe, value: pr.highestRpe ? getEffortScore(pr.highestRpe) : null },
                 { label: 'Most Sparring Rounds', icon: '🥊', log: pr.mostRounds, value: pr.mostRounds?.sparringRounds },
               ].map(({ label, icon, log, value }) => log && (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--bg-color)', borderRadius: '8px', padding: '0.75rem 1rem', border: '1px solid var(--border-color)' }}>

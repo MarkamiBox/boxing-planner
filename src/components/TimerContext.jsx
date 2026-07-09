@@ -65,6 +65,51 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
   const isGuided = activeWorkout && activeWorkout.steps && activeWorkout.steps.length > 0;
   const currentStep = isGuided ? activeWorkout.steps[currentStepIdx] : null;
 
+  // Wake Lock API integration to prevent screen sleep during active timer
+  const wakeLockRef = useRef(null);
+
+  useEffect(() => {
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.warn('Failed to acquire wake lock:', err);
+        }
+      }
+    }
+
+    async function releaseWakeLock() {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        } catch (err) {
+          console.error('Failed to release wake lock:', err);
+        }
+      }
+    }
+
+    if (isRunning) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    // Re-acquire wake lock if page visibility changes (browser requirement)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isRunning) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRunning]);
+
   // Auto-tagging helper
   const getNoteTag = () => {
     const phaseLabel = phase.toUpperCase();

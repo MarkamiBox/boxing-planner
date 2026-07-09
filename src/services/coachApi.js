@@ -1,8 +1,9 @@
 /**
  * Coach API Service — Version 2
-*/
+ */
 
 import { compressAvailability, detectSkipPatterns } from '../components/AvailabilityCalendar';
+import { getEffortScore, getLogSoreness } from '../utils';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -25,9 +26,9 @@ function detectWeeklyOverload(logs) {
     return Math.floor((new Date() - new Date(l.date)) / 86400000) <= 7;
   });
   if (week.length < 2) return false;
-  const avgEnergy = week.reduce((a, l) => a + (l.energy || 0), 0) / week.length;
-  const highSoreness = week.some(l => (l.musclesSoreness || 0) >= 8);
-  return avgEnergy <= 4.5 || highSoreness;
+  const avgRpe = week.reduce((a, l) => a + getEffortScore(l), 0) / week.length;
+  const highSoreness = week.some(l => getLogSoreness(l) >= 8);
+  return avgRpe >= 5.5 || highSoreness;
 }
 
 function detectGoalReached(logs, goals) {
@@ -184,7 +185,12 @@ function detectBodyMapPatterns(logs) {
 function buildAthleteSnapshot(profile, logs, availability, locations, weeks, currentWeekId) {
   const recent = (logs || []).filter(l => l.rpe > 0 || l.energy > 0).slice(0, 7);
   const last = recent[0];
-  const avg = (key) => {
+  
+  const avgRpeVal = recent.length > 0
+    ? (recent.reduce((a, l) => a + getEffortScore(l), 0) / recent.length)
+    : NaN;
+
+  const getAvgField = (key) => {
     const valid = recent.filter(l => l[key] !== undefined && l[key] !== null);
     return valid.length > 0
       ? (valid.reduce((a, l) => a + l[key], 0) / valid.length).toFixed(1)
@@ -199,25 +205,28 @@ function buildAthleteSnapshot(profile, logs, availability, locations, weeks, cur
     : null;
 
   const daysSinceLast = getDaysSinceLastLog(logs);
-  const consecutiveLowEnergy = recent.length >= 3 && recent.slice(0, 3).every(l => {
-    if (l.rpe !== undefined) return l.rpe >= 6;
-    return l.energy !== undefined && l.energy <= 5;
-  });
-  const highSoreness = last?.musclesSoreness >= 8;
+  const consecutiveLowEnergy = recent.length >= 3 && recent.slice(0, 3).every(l => getEffortScore(l) >= 6);
+  const lastSoreness = getLogSoreness(last);
+  const highSoreness = lastSoreness >= 8;
 
   const bodyMapAlerts = detectBodyMapPatterns(logs);
 
-  const avgRpeVal = parseFloat(avg('rpe'));
-  const avgEnergyVal = parseFloat(avg('energy'));
-  const safeRpe = !isNaN(avgRpeVal) ? avgRpeVal : (!isNaN(avgEnergyVal) ? 10 - avgEnergyVal : 7);
+  const safeRpe = !isNaN(avgRpeVal) ? avgRpeVal : 7;
   const rawFatigue = (
     safeRpe * 0.35 +
-    (last?.musclesSoreness || 0) * 0.25 +
+    lastSoreness * 0.25 +
     (avgSleep ? Math.max(0, 8 - parseFloat(avgSleep)) * 0.4 : 0) +
     (consecutiveLowEnergy ? 1.5 : 0) +
     (daysSinceLast <= 1 ? 0.5 : 0)
   );
   const fatigueScore = Math.min(10, rawFatigue).toFixed(1);
+
+  // Sparring aggregation
+  const sparringSessions = recent.filter(l => l.sparringRounds > 0);
+  const totalSparringRounds = sparringSessions.reduce((sum, l) => sum + (l.sparringRounds || 0), 0);
+  const avgSparringDrop = sparringSessions.length > 0
+    ? (sparringSessions.reduce((sum, l) => sum + (l.lastRoundDrop || 0), 0) / sparringSessions.length).toFixed(1)
+    : '-';
 
   return `═══ ATHLETE SNAPSHOT ═══
 Profile: ${profile.age}y · ${lastWeight}kg · ${profile.height}cm · ${profile.stance}
@@ -227,14 +236,15 @@ Resting HR: ${profile.restingHR}bpm${profile.vo2max ? ` | VO2max: ${profile.vo2m
 Levels (1-5): Cardio:${profile.levels?.cardio} | Tech:${profile.levels?.technique} | Footwork:${profile.levels?.footwork} | Defense:${profile.levels?.defense} | Jab:${profile.levels?.jab} | Ring IQ:${profile.levels?.reading}
 
 State (last ${recent.length} sessions):
-  Avg RPE: ${!isNaN(avgRpeVal) ? avgRpeVal.toFixed(1) : '-'}/10 ${avg('energy') !== '-' ? `(Legacy Energy: ${avg('energy')}/10)` : ''}
-  ${avgSleep ? `Avg Sleep: ${avgSleep}h` : 'No sleep data'} | Last soreness: ${last?.musclesSoreness || '-'}/10
+  Avg RPE: ${!isNaN(avgRpeVal) ? avgRpeVal.toFixed(1) : '-'}/10 ${getAvgField('energy') !== '-' ? `(Legacy Energy: ${getAvgField('energy')}/10)` : ''}
+  ${avgSleep ? `Avg Sleep: ${avgSleep}h` : 'No sleep data'} | Last soreness: ${last ? lastSoreness : '-'}/10
+  Recent Sparring: ${sparringSessions.length} sessions, ${totalSparringRounds} rounds total ${sparringSessions.length > 0 ? `(Avg performance drop: ${avgSparringDrop}/10)` : ''}
   Days since last session: ${daysSinceLast}
 
 FATIGUE: ${fatigueScore}/10 ${parseFloat(fatigueScore) >= 7 ? '⚠️ HIGH' : parseFloat(fatigueScore) >= 5 ? '⚡ MODERATE' : '✅ RECOVERED'}
   Formula: avgRpe*0.35 + lastSoreness*0.25 + sleepDebt*0.4 + highRpeStreak*1.5 + backToBack*0.5
 
-${consecutiveLowEnergy ? '🚨 3+ sessions energy ≤5 — DELOAD REQUIRED\n' : ''}${highSoreness ? `🚨 Soreness ${last.musclesSoreness}/10 — reduce volume tomorrow\n` : ''}${daysSinceLast >= 5 ? `⚠️ ${daysSinceLast} days inactive — assess readiness\n` : ''}${bodyMapAlerts}
+${consecutiveLowEnergy ? '🚨 3+ sessions RPE ≥6 — DELOAD REQUIRED\n' : ''}${highSoreness ? `🚨 Soreness ${lastSoreness}/10 — reduce volume tomorrow\n` : ''}${daysSinceLast >= 5 ? `⚠️ ${daysSinceLast} days inactive — assess readiness\n` : ''}${bodyMapAlerts}
 Locations:
 ${profile.locations?.length > 0
       ? profile.locations.map(l => `  ${l.name}: ${l.equipment}${l.schedule ? ' [FIXED COURSES — do not modify UNLESS deload/injury]' : ''}`).join('\n')
@@ -269,7 +279,9 @@ function buildRecentLogs(logs) {
   const lines = recent.map(l => {
     let metrics = l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'} L:${l.legs || '-'}`;
     let line = `  ${l.date} [${l.type}] "${l.name}" | ${l.duration || '-'}min | ${metrics}`;
-    if (l.musclesSoreness) line += ` | Sore:${l.musclesSoreness}`;
+    const sore = getLogSoreness(l);
+    if (sore > 0) line += ` | Sore:${sore}`;
+    if (l.sparringRounds > 0) line += ` | Sparring:${l.sparringRounds}rnd (Drop:${l.lastRoundDrop || 0}/10)`;
     if (l.sleepHours) line += ` | Sleep:${l.sleepHours}h`;
     if (l.skippedSteps > 0) line += ` | Skipped:${l.skippedSteps}`;
     if (l.bodyMap) {
@@ -460,12 +472,12 @@ ALWAYS save to memory: injury area, date, severity, modifications applied.`;
 }
 
 function buildDeloadModule(logs) {
-  const recent = (logs || []).filter(l => l.energy > 0).slice(0, 5);
-  const avgEnergy = recent.length > 0
-    ? (recent.reduce((a, l) => a + l.energy, 0) / recent.length).toFixed(1) : '-';
+  const recent = (logs || []).filter(l => l.rpe > 0 || l.energy > 0).slice(0, 5);
+  const avgRpeVal = recent.length > 0
+    ? (recent.reduce((a, l) => a + getEffortScore(l), 0) / recent.length).toFixed(1) : '-';
   return `═══ DELOAD PROTOCOL ═══
-Avg energy last ${recent.length} sessions: ${avgEnergy}/10
-${recent.some(l => l.musclesSoreness >= 7) ? '⚠️ High soreness in recent logs' : ''}
+Avg RPE last ${recent.length} sessions: ${avgRpeVal}/10
+${recent.some(l => getLogSoreness(l) >= 7) ? '⚠️ High soreness in recent logs' : ''}
 
 RULES:
 - Volume -40-50%, intensity -20-30%
@@ -531,13 +543,13 @@ function buildAnalysisModule(logs, topic) {
     const rated = all.filter(l => l.rpe > 0 || l.energy > 0).slice(0, 20);
     return `═══ RPE & ENERGY ANALYSIS ═══
   Sessions: ${rated.length}
-  Data:\n${rated.slice(0, 10).map(l => `    ${l.date} [${l.type}]: ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy}`} | Sleep:${l.sleepHours || '?'}h | Sore:${l.musclesSoreness || '?'}`).join('\n')}
+  Data:\n${rated.slice(0, 10).map(l => `    ${l.date} [${l.type}]: ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy}`} | Sleep:${l.sleepHours || '?'}h | Sore:${getLogSoreness(l) || '?'}`).join('\n')}
   INSTRUCTION: Identify trend, sleep-exertion correlation, type-specific patterns, fatigue accumulation.`;
   }
 
   const recent = all.filter(l => l.rpe > 0 || l.energy > 0).slice(0, 15);
   return `═══ STATS DATA (${recent.length} sessions) ═══
-${recent.map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'}`} Sleep:${l.sleepHours || '?'}h Sore:${l.musclesSoreness || '?'}`).join('\n')}
+${recent.map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'}`} Sleep:${l.sleepHours || '?'}h Sore:${getLogSoreness(l) || '?'}`).join('\n')}
 INSTRUCTION: Answer the specific question with data. Be quantitative. Clear verdict + actionable fix.`;
 }
 
@@ -563,7 +575,7 @@ APPROACH:
 5. Specific prescription — not generic advice
 
 Recent data:
-${recent.slice(0, 7).map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'}`} Sore:${l.musclesSoreness || '-'} | "${(l.notes || '').slice(0, 60)}"`).join('\n')}`;
+${recent.slice(0, 7).map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'}`} Sore:${getLogSoreness(l) || '-'} | "${(l.notes || '').slice(0, 60)}"`).join('\n')}`;
 }
 
 function buildTechniqueModule(profile) {
@@ -1037,14 +1049,14 @@ async function parseAnthropicStream(reader, { onTextChunk, onToolUse }) {
           }
         } else if (event.type === 'content_block_stop') {
           if (currentToolUse) {
-            try { currentToolUse.input = JSON.parse(currentToolInput); } catch { currentToolUse.input = {}; }
+            try { currentToolUse.input = JSON.parse(currentToolInput); } catch (e) { console.error('Error parsing tool input:', e); currentToolUse.input = {}; }
             toolUses.push(currentToolUse);
             if (onToolUse) onToolUse(currentToolUse);
             currentToolUse = null;
             currentToolInput = '';
           }
         }
-      } catch { }
+      } catch (e) { console.warn('Error parsing Anthropic stream chunk:', e); }
     }
   }
   return { text: fullText, toolUses };
@@ -1076,7 +1088,7 @@ async function parseOpenAIStream(reader, { onTextChunk, onToolUse }) {
             const parsed = { id: tc.id, name: tc.name, input: JSON.parse(tc.arguments || '{}') };
             toolUses.push(parsed);
             if (onToolUse) onToolUse(parsed);
-          } catch { }
+          } catch (e) { console.error('Error parsing OpenAI tool arguments:', e); }
         }
         continue;
       }
@@ -1098,7 +1110,7 @@ async function parseOpenAIStream(reader, { onTextChunk, onToolUse }) {
             if (tc.function?.arguments) toolCallMap[idx].arguments += tc.function.arguments;
           }
         }
-      } catch { }
+      } catch (e) { console.warn('Error parsing OpenAI stream chunk:', e); }
     }
   }
   return { text: fullText, toolUses };
@@ -1141,7 +1153,7 @@ async function parseGoogleStream(reader, { onTextChunk, onToolUse }) {
             if (onToolUse) onToolUse(tc);
           }
         }
-      } catch (e) { }
+      } catch (e) { console.warn('Error parsing Google stream chunk:', e); }
     }
   }
   return { text: fullText, toolUses };
