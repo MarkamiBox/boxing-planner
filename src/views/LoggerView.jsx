@@ -21,11 +21,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
   });
   const [durationStr, setDurationStr] = useState(activeWorkout ? String(calculateDuration(activeWorkout, profile?.locations || [], activeWorkout.sourceDay || '')) : '');
 
-  const [energy, setEnergy] = useState(7);
-  const [cardio, setCardio] = useState(7);
-  const [legs, setLegs] = useState(7);
-  const [intensity, setIntensity] = useState(7);
-  const [focus, setFocus] = useState(7);
+  const [rpe, setRpe] = useState(7); // Rate of Perceived Exertion (1-10)
 
   const [notes, setNotes] = useState(activeWorkout ? `Completed: ${activeWorkout.name}` : '');
   const [combinedSessionNotes, setCombinedSessionNotes] = useState('');
@@ -87,11 +83,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
         if (d.type !== undefined) setType(d.type);
         if (d.timeOfDay !== undefined) setTimeOfDay(d.timeOfDay);
         if (d.durationStr !== undefined) setDurationStr(d.durationStr);
-        if (d.energy !== undefined) setEnergy(d.energy);
-        if (d.cardio !== undefined) setCardio(d.cardio);
-        if (d.legs !== undefined) setLegs(d.legs);
-        if (d.intensity !== undefined) setIntensity(d.intensity);
-        if (d.focus !== undefined) setFocus(d.focus);
+        if (d.rpe !== undefined) setRpe(d.rpe);
         if (d.notes !== undefined) setNotes(d.notes);
         if (d.distance !== undefined) setDistance(d.distance);
         if (d.pace !== undefined) setPace(d.pace);
@@ -110,14 +102,13 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
     if (activeWorkout) return;
     const timer = setTimeout(() => {
       const draft = {
-        date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus,
+        date, type, timeOfDay, durationStr, rpe,
         notes, distance, pace, time, sparringRounds, lastRoundDrop,
         bodyWeight, sleepHours, sleepQuality, bodyMap
       };
       setSavedDraft(draft);
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [date, type, timeOfDay, durationStr, energy, cardio, legs, intensity, focus, notes, distance, pace, time, sparringRounds, lastRoundDrop, bodyWeight, sleepHours, sleepQuality, bodyMap, setSavedDraft, activeWorkout]);
+    }, [date, type, timeOfDay, durationStr, rpe, notes, distance, pace, time, sparringRounds, lastRoundDrop, bodyWeight, sleepHours, sleepQuality, bodyMap, setSavedDraft, activeWorkout]);
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -143,11 +134,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
       type,
       name: activeWorkout ? activeWorkout.name : '',
       duration: durationStr ? durationStr + ' min' : '',
-      energy,
-      cardio,
-      legs,
-      intensity,
-      focus,
+      rpe,
       notes,
       bodyWeight: bodyWeight ? Number(bodyWeight) : null,
       sleepHours: sleepHours ? Number(sleepHours) : null,
@@ -182,7 +169,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
     setTimeout(() => {
       setSavedMessage(false);
       // Show coach bridge prompt after save animation
-      if (setActiveTab && setPendingCoachContext && energy > 0) {
+      if (setActiveTab && setPendingCoachContext && rpe > 0) {
         setShowCoachBridge(true);
         setLastSavedLog(newLog);
       }
@@ -249,7 +236,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
   );
 
   const displayedLogs = showAllLogs ? logs : logs.slice(0, 3);
-  const isPerfect = (log) => log.skippedSteps === 0 && log.energy > 0;
+  const isPerfect = (log) => log.skippedSteps === 0 && (log.rpe > 0 || log.energy > 0);
 
   return (
     <div className="page-container logger-view">
@@ -287,20 +274,8 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
 
         {/* Sliders mimicking QuickLogSheet */}
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Energia</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{energy}/10</span></div>
-          <input type="range" min="1" max="10" value={energy} onChange={e => setEnergy(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cardio</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{cardio}/10</span></div>
-          <input type="range" min="1" max="10" value={cardio} onChange={e => setCardio(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Gambe</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{legs}/10</span></div>
-          <input type="range" min="1" max="10" value={legs} onChange={e => setLegs(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Intensità</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{intensity}/10</span></div>
-          <input type="range" min="1" max="10" value={intensity} onChange={e => setIntensity(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Focus Mentale</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{focus}/10</span></div>
-          <input type="range" min="1" max="10" value={focus} onChange={e => setFocus(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>RPE (Sforzo Percepito)</span><span style={{ color: 'var(--primary)', fontWeight: 700 }}>{rpe}/10</span></div>
+          <input type="range" min="1" max="10" value={rpe} onChange={e => setRpe(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)', marginTop: '-0.5rem' }} />
         </div>
 
         {type === 'Running' && (
@@ -510,11 +485,7 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
                     />
                   </div>
 
-                  {renderEditSlider('Energy', 'energy')}
-                  {renderEditSlider('Cardio', 'cardio')}
-                  {renderEditSlider('Legs', 'legs')}
-                  {renderEditSlider('Intensity', 'intensity')}
-                  {renderEditSlider('Focus', 'focus')}
+                  {renderEditSlider('RPE (Sforzo Percepito)', 'rpe')}
                   <div className="form-group" style={{ marginTop: '0.5rem' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Notes</label>
                     <textarea rows="2" value={editDraft.notes || ''} onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))} style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.85rem', resize: 'vertical' }} />
@@ -546,11 +517,17 @@ export function LoggerView({ profile, logs, setLogs, activeWorkout, setActiveWor
                     {log.date}{log.timeOfDay ? ` @ ${log.timeOfDay}` : ''}{log.duration ? ` · ${log.duration}` : ''}
                   </div>
                   <div className="log-stats-row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span title="Energy">⚡ {log.energy || '-'}</span>
-                    <span title="Cardio">💨 {log.cardio || '-'}</span>
-                    <span title="Legs">🦵 {log.legs || '-'}</span>
-                    <span title="Intensity">🔥 {log.intensity || '-'}</span>
-                    <span title="Focus">🎯 {log.focus || '-'}</span>
+                    {log.rpe > 0 ? (
+                      <span title="RPE">📊 RPE: {log.rpe}</span>
+                    ) : (
+                      <>
+                        {log.energy > 0 && <span title="Energy">⚡ {log.energy}</span>}
+                        {log.cardio > 0 && <span title="Cardio">💨 {log.cardio}</span>}
+                        {log.legs > 0 && <span title="Legs">🦵 {log.legs}</span>}
+                        {log.intensity > 0 && <span title="Intensity">🔥 {log.intensity}</span>}
+                        {log.focus > 0 && <span title="Focus">🎯 {log.focus}</span>}
+                      </>
+                    )}
                     {log.bodyWeight && <span title="Peso">⚖️ {log.bodyWeight}kg</span>}
                     {log.sleepHours && <span title="Sonno">🛏️ {log.sleepHours}h</span>}
                     {log.type === 'Running' && log.distance && <span>📍 {log.distance}</span>}

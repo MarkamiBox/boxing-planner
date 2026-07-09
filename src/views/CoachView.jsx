@@ -145,7 +145,8 @@ export function CoachView({
     if (pendingCoachContext) {
       const log = pendingCoachContext;
       let prefill = `Ho appena completato "${log.name || 'una sessione'}".`;
-      if (log.energy > 0) prefill += ` Energy: ${log.energy}/10, Cardio: ${log.cardio}/10.`;
+      if (log.rpe > 0) prefill += ` RPE: ${log.rpe}/10.`;
+      else if (log.energy > 0) prefill += ` Energy: ${log.energy}/10, Cardio: ${log.cardio}/10.`;
       if (log.skippedSteps > 0) prefill += ` Ho saltato ${log.skippedSteps} step guidati.`;
       if (log.notes) prefill += ` Note: ${log.notes}`;
       setInputText(prefill);

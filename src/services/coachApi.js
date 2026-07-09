@@ -182,11 +182,14 @@ function detectBodyMapPatterns(logs) {
 }
 
 function buildAthleteSnapshot(profile, logs, availability, locations, weeks, currentWeekId) {
-  const recent = (logs || []).filter(l => l.energy > 0).slice(0, 7);
+  const recent = (logs || []).filter(l => l.rpe > 0 || l.energy > 0).slice(0, 7);
   const last = recent[0];
-  const avg = (key) => recent.length > 0
-    ? (recent.reduce((a, l) => a + (l[key] || 0), 0) / recent.length).toFixed(1)
-    : '-';
+  const avg = (key) => {
+    const valid = recent.filter(l => l[key] !== undefined && l[key] !== null);
+    return valid.length > 0
+      ? (valid.reduce((a, l) => a + l[key], 0) / valid.length).toFixed(1)
+      : '-';
+  };
 
   const withWeight = logs.filter(l => l.bodyWeight);
   const withSleep = logs.filter(l => l.sleepHours);
@@ -196,15 +199,19 @@ function buildAthleteSnapshot(profile, logs, availability, locations, weeks, cur
     : null;
 
   const daysSinceLast = getDaysSinceLastLog(logs);
-  const consecutiveLowEnergy = recent.length >= 3 && recent.slice(0, 3).every(l => l.energy <= 5);
+  const consecutiveLowEnergy = recent.length >= 3 && recent.slice(0, 3).every(l => {
+    if (l.rpe !== undefined) return l.rpe >= 6;
+    return l.energy !== undefined && l.energy <= 5;
+  });
   const highSoreness = last?.musclesSoreness >= 8;
 
   const bodyMapAlerts = detectBodyMapPatterns(logs);
 
-  const avgE = parseFloat(avg('energy'));
-  const safeAvgEnergy = isNaN(avgE) ? 5 : avgE;
+  const avgRpeVal = parseFloat(avg('rpe'));
+  const avgEnergyVal = parseFloat(avg('energy'));
+  const safeRpe = !isNaN(avgRpeVal) ? avgRpeVal : (!isNaN(avgEnergyVal) ? 10 - avgEnergyVal : 7);
   const rawFatigue = (
-    (10 - safeAvgEnergy) * 0.35 +
+    safeRpe * 0.35 +
     (last?.musclesSoreness || 0) * 0.25 +
     (avgSleep ? Math.max(0, 8 - parseFloat(avgSleep)) * 0.4 : 0) +
     (consecutiveLowEnergy ? 1.5 : 0) +
@@ -220,12 +227,12 @@ Resting HR: ${profile.restingHR}bpm${profile.vo2max ? ` | VO2max: ${profile.vo2m
 Levels (1-5): Cardio:${profile.levels?.cardio} | Tech:${profile.levels?.technique} | Footwork:${profile.levels?.footwork} | Defense:${profile.levels?.defense} | Jab:${profile.levels?.jab} | Ring IQ:${profile.levels?.reading}
 
 State (last ${recent.length} sessions):
-  Avg Energy:${avg('energy')}/10 | Avg Cardio:${avg('cardio')}/10 | Avg Focus:${avg('focus')}/10
+  Avg RPE: ${!isNaN(avgRpeVal) ? avgRpeVal.toFixed(1) : '-'}/10 ${avg('energy') !== '-' ? `(Legacy Energy: ${avg('energy')}/10)` : ''}
   ${avgSleep ? `Avg Sleep: ${avgSleep}h` : 'No sleep data'} | Last soreness: ${last?.musclesSoreness || '-'}/10
   Days since last session: ${daysSinceLast}
 
 FATIGUE: ${fatigueScore}/10 ${parseFloat(fatigueScore) >= 7 ? '⚠️ HIGH' : parseFloat(fatigueScore) >= 5 ? '⚡ MODERATE' : '✅ RECOVERED'}
-  Formula: (10-avgEnergy)*0.35 + lastSoreness*0.25 + sleepDebt*0.4 + lowEnergyStreak*1.5 + backToBack*0.5
+  Formula: avgRpe*0.35 + lastSoreness*0.25 + sleepDebt*0.4 + highRpeStreak*1.5 + backToBack*0.5
 
 ${consecutiveLowEnergy ? '🚨 3+ sessions energy ≤5 — DELOAD REQUIRED\n' : ''}${highSoreness ? `🚨 Soreness ${last.musclesSoreness}/10 — reduce volume tomorrow\n` : ''}${daysSinceLast >= 5 ? `⚠️ ${daysSinceLast} days inactive — assess readiness\n` : ''}${bodyMapAlerts}
 Locations:
@@ -257,10 +264,11 @@ function buildCurrentWeek(schedule, currentWeekId) {
 }
 
 function buildRecentLogs(logs) {
-  const recent = (logs || []).filter(l => l.energy > 0).slice(0, 7);
+  const recent = (logs || []).filter(l => l.rpe > 0 || l.energy > 0).slice(0, 7);
   if (recent.length === 0) return '═══ RECENT LOGS ═══\n  No sessions logged.';
   const lines = recent.map(l => {
-    let line = `  ${l.date} [${l.type}] "${l.name}" | ${l.duration || '-'}min | E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'} L:${l.legs || '-'}`;
+    let metrics = l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'} L:${l.legs || '-'}`;
+    let line = `  ${l.date} [${l.type}] "${l.name}" | ${l.duration || '-'}min | ${metrics}`;
     if (l.musclesSoreness) line += ` | Sore:${l.musclesSoreness}`;
     if (l.sleepHours) line += ` | Sleep:${l.sleepHours}h`;
     if (l.skippedSteps > 0) line += ` | Skipped:${l.skippedSteps}`;
@@ -514,28 +522,28 @@ function buildAnalysisModule(logs, topic) {
     const bodyMapRunning = runs.filter(l => l.bodyMap && Object.values(l.bodyMap).some(b => b.intensity >= 6));
     return `═══ RUNNING ANALYSIS ═══
   Runs: ${runs.length} | Avg dist: ${avgDist}km | Total: ${distances.reduce((a, b) => a + b, 0).toFixed(1)}km
-  Recent:\n${runs.slice(0, 5).map(l => `    ${l.date}: ${l.distance || '-'}km @ ${l.pace || '-'}/km | C:${l.cardio} | L:${l.legs || '-'}${l.bodyMap ? ' | BodyMap: ' + Object.values(l.bodyMap).filter(b => b.intensity >= 6).map(b => `${b.label}(${b.intensity})`).join(',') : ''}`).join('\n')}
+  Recent:\n${runs.slice(0, 5).map(l => `    ${l.date}: ${l.distance || '-'}km @ ${l.pace || '-'}/km | RPE:${l.rpe || (l.cardio || '-')} | L:${l.legs || '-'}${l.bodyMap ? ' | BodyMap: ' + Object.values(l.bodyMap).filter(b => b.intensity >= 6).map(b => `${b.label}(${b.intensity})`).join(',') : ''}`).join('\n')}
   ${bodyMapRunning.length > 0 ? `ℹ️ Note: some runs had higher muscle fatigue/DOMS logs.` : ''}
   INSTRUCTION: Identify pace trend, distance progression. Give specific protocol recommendations.`;
   }
 
   if (topic === 'energy') {
-    const rated = all.filter(l => l.energy > 0).slice(0, 20);
-    return `═══ ENERGY ANALYSIS ═══
+    const rated = all.filter(l => l.rpe > 0 || l.energy > 0).slice(0, 20);
+    return `═══ RPE & ENERGY ANALYSIS ═══
   Sessions: ${rated.length}
-  Data:\n${rated.slice(0, 10).map(l => `    ${l.date} [${l.type}]: E:${l.energy} | Sleep:${l.sleepHours || '?'}h | Sore:${l.musclesSoreness || '?'}`).join('\n')}
-  INSTRUCTION: Identify trend, sleep-energy correlation, type-specific patterns, fatigue accumulation.`;
+  Data:\n${rated.slice(0, 10).map(l => `    ${l.date} [${l.type}]: ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy}`} | Sleep:${l.sleepHours || '?'}h | Sore:${l.musclesSoreness || '?'}`).join('\n')}
+  INSTRUCTION: Identify trend, sleep-exertion correlation, type-specific patterns, fatigue accumulation.`;
   }
 
-  const recent = all.filter(l => l.energy > 0).slice(0, 15);
+  const recent = all.filter(l => l.rpe > 0 || l.energy > 0).slice(0, 15);
   return `═══ STATS DATA (${recent.length} sessions) ═══
-${recent.map(l => `  ${l.date} [${l.type}] E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'} Sleep:${l.sleepHours || '?'}h Sore:${l.musclesSoreness || '?'}`).join('\n')}
+${recent.map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'} I:${l.intensity || '-'} F:${l.focus || '-'}`} Sleep:${l.sleepHours || '?'}h Sore:${l.musclesSoreness || '?'}`).join('\n')}
 INSTRUCTION: Answer the specific question with data. Be quantitative. Clear verdict + actionable fix.`;
 }
 
 function buildDiagnoseModule(logs, messages) {
   const text = (messages || []).slice(-3).map(m => m.content || '').join(' ').toLowerCase();
-  const recent = (logs || []).filter(l => l.energy > 0).slice(0, 10);
+  const recent = (logs || []).filter(l => l.rpe > 0 || l.energy > 0).slice(0, 10);
 
   let focus = '';
   if (/round [3-9]|quart|terz|gas|fiato/.test(text))
@@ -555,7 +563,7 @@ APPROACH:
 5. Specific prescription — not generic advice
 
 Recent data:
-${recent.slice(0, 7).map(l => `  ${l.date} [${l.type}] E:${l.energy} C:${l.cardio || '-'} Sore:${l.musclesSoreness || '-'} | "${(l.notes || '').slice(0, 60)}"`).join('\n')}`;
+${recent.slice(0, 7).map(l => `  ${l.date} [${l.type}] ${l.rpe > 0 ? `RPE:${l.rpe}` : `E:${l.energy} C:${l.cardio || '-'}`} Sore:${l.musclesSoreness || '-'} | "${(l.notes || '').slice(0, 60)}"`).join('\n')}`;
 }
 
 function buildTechniqueModule(profile) {
@@ -619,7 +627,7 @@ Today is ${dayName}. Planned today: ${todaySessions.length} session(s).
   Done: ${todayDone.map(s => s.name).join(', ') || 'none'}
   Upcoming: ${todayTodo.map(s => `${s.name}${s.plannedTime ? ' @ ' + s.plannedTime : ''}`).join(', ') || 'none'}
 
-Last logged session: ${lastLog ? `${lastLog.date} "${lastLog.name}" E:${lastLog.energy} C:${lastLog.cardio || '-'}` : 'none'}
+Last logged session: ${lastLog ? `${lastLog.date} "${lastLog.name}" ${lastLog.rpe > 0 ? `RPE:${lastLog.rpe}` : `E:${lastLog.energy} C:${lastLog.cardio || '-'}`}` : 'none'}
 
 PRE-SESSION ADVICE RULES:
 - Check fatigue score and last session's soreness

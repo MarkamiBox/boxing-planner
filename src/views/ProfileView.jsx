@@ -345,21 +345,15 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     const todayISO = new Date().toISOString().split('T')[0];
     const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
-    const recentFull = logs.filter(l => l.energy > 0).slice(0, 15);
+    const recentFull = logs.filter(l => l.rpe > 0 || l.energy > 0).slice(0, 15);
     const lastBoxing = logs.find(l => l.type === 'Boxing');
     const lastRunning = logs.find(l => l.type === 'Running');
     const withWeight = logs.filter(l => l.bodyWeight);
     const withSleep = logs.filter(l => l.sleepHours);
 
     // Compute trends
-    const avgEnergy = recentFull.length > 0
-      ? (recentFull.reduce((a, l) => a + l.energy, 0) / recentFull.length).toFixed(1)
-      : '-';
-    const avgCardio = recentFull.length > 0
-      ? (recentFull.reduce((a, l) => a + (l.cardio || 0), 0) / recentFull.length).toFixed(1)
-      : '-';
-    const avgFocus = recentFull.filter(l => l.focus > 0).length > 0
-      ? (recentFull.filter(l => l.focus > 0).reduce((a, l) => a + l.focus, 0) / recentFull.filter(l => l.focus > 0).length).toFixed(1)
+    const avgRpe = recentFull.length > 0
+      ? (recentFull.reduce((a, l) => a + (l.rpe || (l.energy ? 10 - l.energy : 0)), 0) / recentFull.length).toFixed(1)
       : '-';
     const avgSleep = withSleep.length > 0
       ? (withSleep.slice(0, 7).reduce((a, l) => a + l.sleepHours, 0) / Math.min(withSleep.length, 7)).toFixed(1)
@@ -414,9 +408,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
     if (avgSleep) text += `Avg sleep (last 7 sessions): ${avgSleep}h/night ${Number(avgSleep) < 6.5 ? '⚠️ LOW — recovery may be compromised' : '✅'}\n`;
     if (lastWeight) text += `Last weighed: ${lastWeight}kg (${withWeight[0].date})\n`;
     text += `\nRecent avg performance (last ${recentFull.length} rated sessions):\n`;
-    text += `  Energy:    ${avgEnergy}/10\n`;
-    text += `  Cardio:    ${avgCardio}/10\n`;
-    text += `  Focus:     ${avgFocus}/10\n`;
+    text += `  RPE:       ${avgRpe}/10\n`;
     if (totalSkipped > 0) text += `  Guided steps skipped in recent sessions: ${totalSkipped} (indicates fatigue or time constraints)\n`;
     text += '\n';
 
@@ -428,7 +420,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       text += `Duration: ${lastBoxing.duration || '-'}\n`;
       text += `Sparring rounds: ${lastBoxing.sparringRounds || 0}\n`;
       if (lastBoxing.sparringRounds > 0) text += `End-of-session performance drop: ${lastBoxing.lastRoundDrop}/10 ${lastBoxing.lastRoundDrop < 5 ? '(significant gas tank issue)' : ''}\n`;
-      text += `Energy: ${lastBoxing.energy}/10 | Cardio: ${lastBoxing.cardio}/10 | Focus: ${lastBoxing.focus || '-'}/10 | Intensity: ${lastBoxing.intensity || '-'}/10\n`;
+      text += `RPE: ${lastBoxing.rpe || (lastBoxing.energy ? 10 - lastBoxing.energy : '-')}/10\n`;
       if (lastBoxing.notes) text += `Notes: "${lastBoxing.notes}"\n`;
       text += '\n';
     }
@@ -437,7 +429,7 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
       text += `🏃 LAST RUNNING SESSION (${lastRunning.date})\n`;
       text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       text += `Distance: ${lastRunning.distance || '-'} | Time: ${lastRunning.time || '-'} | Pace: ${lastRunning.pace || '-'}\n`;
-      text += `Cardio feel: ${lastRunning.cardio}/10 | Legs: ${lastRunning.legs}/10\n\n`;
+      text += `RPE: ${lastRunning.rpe || (lastRunning.energy ? 10 - lastRunning.energy : '-')}/10\n\n`;
     }
 
     // ── SESSION HISTORY ───────────────────────────────────────────────────────────
@@ -448,7 +440,11 @@ export function ProfileView({ profile, setProfile, logs, setLogs, goals, setGoal
         const day = new Date(log.date).toLocaleDateString('en-US', { weekday: 'short' });
         text += `${log.date} (${day}) [${log.type}]`;
         if (log.name) text += ` "${log.name}"`;
-        text += ` | Dur: ${log.duration || '-'} | E:${log.energy} C:${log.cardio || '-'} I:${log.intensity || '-'} F:${log.focus || '-'} L:${log.legs || '-'}`;
+        if (log.rpe > 0) {
+          text += ` | Dur: ${log.duration || '-'} | RPE:${log.rpe}`;
+        } else {
+          text += ` | Dur: ${log.duration || '-'} | E:${log.energy} C:${log.cardio || '-'} I:${log.intensity || '-'} F:${log.focus || '-'} L:${log.legs || '-'}`;
+        }
         if (log.skippedSteps > 0) text += ` | ⏭ skipped ${log.skippedSteps}`;
         if (log.notes) text += ` | "${log.notes}"`;
         text += '\n';

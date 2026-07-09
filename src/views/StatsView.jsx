@@ -54,8 +54,9 @@ export function StatsView({ logs, setLogs }) {
   const totalHours = (totalMinutes / 60).toFixed(1);
 
   // ─── Performance Trend (per-session) ─────────────────────────────────────────
-  const trendData = useMemo(() => [...logs].reverse().filter(l => l.energy > 0).map(log => ({
+  const trendData = useMemo(() => [...logs].reverse().filter(l => l.rpe > 0 || l.energy > 0).map(log => ({
     date: log.date.substring(5),
+    rpe: log.rpe || (log.energy ? 10 - log.energy : 0),
     energy: log.energy,
     cardio: log.cardio,
     legs: log.legs,
@@ -93,31 +94,27 @@ export function StatsView({ logs, setLogs }) {
   // ─── Per-type Boxscore ───────────────────────────────────────────────────────
   const boxscoreData = useMemo(() => {
     const typeStats = {};
-    logs.filter(l => l.energy > 0).forEach(log => {
-      if (!typeStats[log.type]) typeStats[log.type] = { count: 0, energy: 0, cardio: 0, intensity: 0, focus: 0 };
+    logs.filter(l => l.rpe > 0 || l.energy > 0).forEach(log => {
+      if (!typeStats[log.type]) typeStats[log.type] = { count: 0, rpe: 0 };
       const t = typeStats[log.type];
       t.count++;
-      t.energy += log.energy || 0;
-      t.cardio += log.cardio || 0;
-      t.intensity += log.intensity || 0;
-      t.focus += log.focus || 0;
+      t.rpe += log.rpe || (log.energy ? 10 - log.energy : 0);
     });
     return Object.entries(typeStats).map(([type, s]) => ({
       type,
-      Energy: +(s.energy / s.count).toFixed(1),
-      Cardio: +(s.cardio / s.count).toFixed(1),
-      Intensity: +(s.intensity / s.count).toFixed(1),
-      Focus: +(s.focus / s.count).toFixed(1),
+      RPE: +(s.rpe / s.count).toFixed(1),
       sessions: s.count,
     }));
   }, [logs]);
 
   // ─── Personal Records ────────────────────────────────────────────────────────
-  const validLogs = logs.filter(l => l.energy > 0);
+  const validLogs = logs.filter(l => l.rpe > 0 || l.energy > 0);
   const pr = {
-    bestEnergy: validLogs.reduce((best, l) => l.energy > (best?.energy || 0) ? l : best, null),
-    bestCardio: validLogs.reduce((best, l) => l.cardio > (best?.cardio || 0) ? l : best, null),
-    bestFocus: validLogs.reduce((best, l) => (l.focus || 0) > ((best?.focus) || 0) ? l : best, null),
+    highestRpe: validLogs.reduce((best, l) => {
+      const currentRpe = l.rpe || (l.energy ? 10 - l.energy : 0);
+      const bestRpe = best?.rpe || (best?.energy ? 10 - best.energy : 0);
+      return currentRpe > bestRpe ? l : best;
+    }, null),
     mostRounds: logs.filter(l => l.sparringRounds > 0).reduce((best, l) => l.sparringRounds > (best?.sparringRounds || 0) ? l : best, null),
   };
 
@@ -315,11 +312,11 @@ export function StatsView({ logs, setLogs }) {
       {activeTab === 'overview' && (
         <>
           <div className="chart-container card">
-            <h3 className="section-title">Performance Trends (Energy / Cardio / Legs)</h3>
+            <h3 className="section-title">Performance Trend (RPE - Sforzo Percepito)</h3>
             {trendData.length < 2 ? (
               <div className="empty-state" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
                 <div style={{ fontWeight: 600 }}>Nothing to plot yet.</div>
-                <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>Log your first session after a workout to start tracking energy, cardio, and leg fatigue over time.</div>
+                <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>Log your first session after a workout to start tracking RPE over time.</div>
               </div>
             ) : (
               <div className="chart-wrapper">
@@ -330,30 +327,7 @@ export function StatsView({ logs, setLogs }) {
                     <YAxis domain={[0, 10]} stroke="var(--text-muted)" fontSize={11} />
                     <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
                     <Legend />
-                    <Line type="monotone" dataKey="energy" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="Energy" />
-                    <Line type="monotone" dataKey="cardio" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Cardio" />
-                    <Line type="monotone" dataKey="legs" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} name="Legs" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-
-          <div className="chart-container card" style={{ marginTop: '1rem' }}>
-            <h3 className="section-title">Intensity & Focus</h3>
-            {trendData.filter(d => d.intensity > 0).length < 2 ? (
-              <div className="empty-state">Not enough data. Log sessions with Intensity ratings.</div>
-            ) : (
-              <div className="chart-wrapper">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                    <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
-                    <YAxis domain={[0, 10]} stroke="var(--text-muted)" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
-                    <Legend />
-                    <Line type="monotone" dataKey="intensity" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Intensity" />
-                    <Line type="monotone" dataKey="focus" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Focus" />
+                    <Line type="monotone" dataKey="rpe" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} name="RPE" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -507,7 +481,7 @@ export function StatsView({ logs, setLogs }) {
       {/* ── By Type Boxscore ── */}
       {activeTab === 'boxscore' && (
         <div className="card">
-          <h3 className="section-title" style={{ marginBottom: '1rem' }}>Average Scores Per Session Type</h3>
+          <h3 className="section-title" style={{ marginBottom: '1rem' }}>Average RPE Per Session Type</h3>
           {boxscoreData.length === 0 ? (
             <div className="empty-state">No data yet. Log sessions with ratings.</div>
           ) : (
@@ -518,13 +492,11 @@ export function StatsView({ logs, setLogs }) {
                     <strong style={{ color: TYPE_COLORS[row.type] || 'var(--text-main)', fontSize: '1rem' }}>{row.type}</strong>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{row.sessions} sessions</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                    {['Energy', 'Cardio', 'Intensity', 'Focus'].map(metric => (
-                      <div key={metric} style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)' }}>{row[metric] || '-'}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{metric}</div>
-                      </div>
-                    ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)' }}>{row.RPE || '-'}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Average RPE</div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -542,9 +514,7 @@ export function StatsView({ logs, setLogs }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {[
-                { label: 'Best Energy', icon: '⚡', log: pr.bestEnergy, value: pr.bestEnergy?.energy },
-                { label: 'Best Cardio', icon: '💨', log: pr.bestCardio, value: pr.bestCardio?.cardio },
-                { label: 'Best Focus', icon: '🎯', log: pr.bestFocus, value: pr.bestFocus?.focus },
+                { label: 'Highest RPE (Max Effort)', icon: '🔥', log: pr.highestRpe, value: pr.highestRpe ? (pr.highestRpe.rpe || (pr.highestRpe.energy ? 10 - pr.highestRpe.energy : 0)) : null },
                 { label: 'Most Sparring Rounds', icon: '🥊', log: pr.mostRounds, value: pr.mostRounds?.sparringRounds },
               ].map(({ label, icon, log, value }) => log && (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--bg-color)', borderRadius: '8px', padding: '0.75rem 1rem', border: '1px solid var(--border-color)' }}>
@@ -553,7 +523,7 @@ export function StatsView({ logs, setLogs }) {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
                     <div style={{ fontWeight: 600, marginTop: '2px' }}>{log.name || log.type} — {log.date}</div>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>{value}<span style={{ fontSize: '1rem' }}>/10</span></div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>{value}{label.includes('RPE') && <span style={{ fontSize: '1rem' }}>/10</span>}</div>
                 </div>
               ))}
             </div>
@@ -694,8 +664,11 @@ export function StatsView({ logs, setLogs }) {
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <span>{log.date}{log.timeOfDay ? ` @ ${log.timeOfDay}` : ''}</span>
-                      {log.duration && <span>· {log.duration}</span>}
-                      <span>· ⚡{log.energy || '-'} 💨{log.cardio || '-'} 🔥{log.intensity || '-'} 🎯{log.focus || '-'}</span>
+                      {log.rpe > 0 ? (
+                        <span>· 📊 RPE:{log.rpe}</span>
+                      ) : (
+                        <span>· ⚡{log.energy || '-'} 💨{log.cardio || '-'} 🔥{log.intensity || '-'} 🎯{log.focus || '-'}</span>
+                      )}
                       {log.bodyWeight && <span>· ⚖️{log.bodyWeight}kg</span>}
                       {log.sleepHours && <span>· 🛏️{log.sleepHours}h</span>}
                     </div>
