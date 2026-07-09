@@ -5,6 +5,7 @@ import { TimeInput } from '../components/TimeInput';
 import { getTodayDayName, getWeekId, getWeekDates, formatTime, calculateDuration, addMinutesToTime, generateId, sanitizeExercise, sanitizeSchedule } from '../utils';
 import { useAppState } from '../hooks/useAppState';
 import { QuickLogSheet } from '../components/QuickLogSheet';
+import defaultMacros from '../data/defaultMacros';
 import './schedule.css';
 
 const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -87,12 +88,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
 
   const historicalSteps = useMemo(() => {
     const stepsMap = new Map();
-    // Default macros that are always available
-    const defaults = [
-      { id: 'def-warmup', type: 'timer', autoAdvance: true, name: 'Riscaldamento', duration: 600, instruction: '', _isDefault: true, parentType: 'Other' },
-      { id: 'def-3rnd', type: 'round', name: '3 Rnd (3/1)', work: 180, rest: 60, rounds: 3, instruction: ' | | ', _isDefault: true, parentType: 'Boxing' },
-      { id: 'def-tabata', type: 'round', name: 'Tabata', work: 20, rest: 10, rounds: 8, instruction: ' | | | | | | | ', _isDefault: true, parentType: 'Other' }
-    ];
+    const defaults = defaultMacros;
     defaults.forEach(d => stepsMap.set(d.name.toLowerCase(), { ...d, originalKey: d.name.toLowerCase() }));
 
     if (weeks) {
@@ -1042,7 +1038,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                           </button>
                           
                           {isMacroListOpen && (
-                            <div style={{ background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '250px', display: 'flex', flexDirection: 'column', marginTop: '4px' }}>
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '350px', display: 'flex', flexDirection: 'column', marginTop: '4px' }}>
                               <div style={{ padding: '0.4rem' }}>
                                 <input 
                                   type="text" 
