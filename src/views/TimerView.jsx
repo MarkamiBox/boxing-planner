@@ -239,8 +239,47 @@ export function TimerView({ presets, setPresets, activeWorkout, setActiveWorkout
 
   const getCurrentInstruction = () => {
     if (!currentStep?.instruction) return null;
-    if (!['interval', 'sets'].includes(currentStep.type)) return currentStep.instruction;
+    
+    // Check if the step type has rounds/sets
+    const isRound = ['round', 'interval', 'sets'].includes(currentStep.type);
+    if (!isRound) return currentStep.instruction;
 
+    // Check if it's split by '|'
+    if (currentStep.instruction.includes('|')) {
+      const parts = currentStep.instruction.split('|').map(s => s.trim());
+      const maxRounds = currentStep.rounds || currentStep.sets || 1;
+      
+      const isRest = phase === 'rest';
+      const targetRound = isRest ? currentRound + 1 : currentRound;
+      const targetIdx = targetRound - 1;
+      const activeText = parts[targetIdx] !== undefined ? parts[targetIdx] : parts[parts.length - 1];
+
+      const isSets = currentStep.type === 'sets';
+      const term = isSets ? 'Set' : 'Round';
+
+      if (isRest) {
+        if (targetRound <= maxRounds) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>Prossimo {term} ({targetRound}/{maxRounds}):</span>
+              <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '1.05em' }}>{activeText}</span>
+            </div>
+          );
+        } else {
+          return <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Recupero di fine esercizio</span>;
+        }
+      }
+
+      const label = phase === 'prep' ? `Preparati per ${term} ${currentRound}/${maxRounds}` : `${term} ${currentRound}/${maxRounds}`;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>{label}:</span>
+          <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.1em' }}>{activeText}</span>
+        </div>
+      );
+    }
+
+    // Fallback: search for round prefixes (e.g., "Round 1: text" or "1. text")
     const segments = currentStep.instruction.split(/(?:\n|\|)/).map(s => s.trim()).filter(Boolean);
     let roundText = null;
     let generalText = [];

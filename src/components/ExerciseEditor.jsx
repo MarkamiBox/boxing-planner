@@ -42,7 +42,7 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
 
   const handleInstructionChange = (stepIdx, roundIdx, newValue) => {
     const step = form.steps[stepIdx];
-    const rounds = step.type === 'interval' ? (step.rounds || 1) : (step.sets || 1);
+    const rounds = (step.type === 'interval' || step.type === 'round') ? (step.rounds || 1) : (step.sets || 1);
     let parts = (step.instruction || '').split(' | ');
     while (parts.length < rounds) parts.push('');
     parts[roundIdx] = newValue;
@@ -57,11 +57,13 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
           <button onClick={() => moveStep(idx, 'down')} disabled={idx === form.steps.length - 1} style={{ color: idx === form.steps.length - 1 ? 'var(--text-muted)' : 'var(--primary)', background: 'none', border: 'none', padding: '4px', cursor: idx === form.steps.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowDown size={16}/></button>
         </div>
         <select value={step.type} onChange={e => updateStep(idx, 'type', e.target.value)} style={{ flex: 1, fontSize: '0.8rem', padding: '4px' }}>
-          <option value="text">Testo</option>
+          <option value="text">Testo (Legacy)</option>
+          <option value="note">Nota (Solo Testo)</option>
           <option value="timer">Timer</option>
-          <option value="interval">Interval</option>
+          <option value="manual_timer">Legacy Timer</option>
+          <option value="round">Round (Work/Rest)</option>
+          <option value="interval">Legacy Interval</option>
           <option value="sets">Sets</option>
-          <option value="manual_timer">Manual Timer</option>
         </select>
         <button onClick={() => removeStep(idx)} style={{ color: 'var(--primary)', background: 'none', border: 'none' }}><Trash2 size={14}/></button>
       </div>
@@ -71,7 +73,7 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
       {['timer', 'manual_timer'].includes(step.type) && (
         <TimeInput label="Duration" value={step.duration || 0} onChange={val => updateStep(idx, 'duration', val)} />
       )}
-      {step.type === 'interval' && (
+      {['interval', 'round'].includes(step.type) && (
         <div style={{ display: 'flex', gap: '4px' }}>
           <TimeInput label="Work" value={step.work || 0} onChange={val => updateStep(idx, 'work', val)} style={{ flex: 1 }} />
           <TimeInput label="Rest" value={step.rest || 0} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
@@ -85,9 +87,9 @@ export function ExerciseEditor({ exercise, onSave, onCancel, onDelete }) {
           <TimeInput label="Rest" value={step.rest || 0} onChange={val => updateStep(idx, 'rest', val)} style={{ flex: 1 }} />
         </div>
       )}
-      {((step.type === 'interval' && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
+      {((['interval', 'round'].includes(step.type) && (step.rounds || 0) > 1) || (step.type === 'sets' && (step.sets || 0) > 1)) ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.4rem' }}>
-          {Array.from({ length: (step.type === 'interval' ? step.rounds : step.sets) }).map((_, rIdx) => {
+          {Array.from({ length: (['interval', 'round'].includes(step.type) ? step.rounds : step.sets) }).map((_, rIdx) => {
             const parts = (step.instruction || '').split(' | ');
             return (
               <div key={rIdx} style={{ display: 'flex', flexDirection: 'column' }}>

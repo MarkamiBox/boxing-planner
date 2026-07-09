@@ -463,7 +463,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     }
 
     // 2. Handle Phase granularity within the current step
-    if (currentStep.type === 'interval') {
+    if (currentStep.type === 'interval' || currentStep.type === 'round') {
       if (phase === 'rest') {
         setPhase('work');
         setTimeLeft(currentStep.work);
@@ -508,7 +508,7 @@ export function TimerProvider({ children, activeWorkout, setActiveWorkout, setAc
     setIsRunning(false);
 
     // Jump into the END of the previous step
-    if (prevStep.type === 'interval') {
+    if (prevStep.type === 'interval' || prevStep.type === 'round') {
       setCurrentRound(prevStep.rounds);
       setPhase('work');
       setTimeLeft(prevStep.work);
