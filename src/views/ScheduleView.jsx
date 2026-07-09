@@ -11,7 +11,7 @@ const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sat
 
 export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, currentWeekId, setCurrentWeekId, setActiveWorkout, setActiveTab, logs, setLogs, onDirtyStateChange, workoutTemplates, setWorkoutTemplates }) {
   const { showAlert, showConfirm } = useDialog();
-  const { t, language } = useAppState();
+  const { t, language, hiddenMacros, setHiddenMacros, macroTagsMap, setMacroTagsMap } = useAppState();
 
   // ── Robust todayDay: updates on visibilitychange so it never stays fossilized
   const [todayDay, setTodayDay] = useState(() => getTodayDayName());
@@ -75,32 +75,14 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     });
     return map;
   }, [logs]);
-  const [hiddenMacros, setHiddenMacros] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('hiddenMacros')) || [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [macroTagsMap, setMacroTagsMap] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('macroTagsMap')) || {};
-    } catch {
-      return {};
-    }
-  });
-
   const hideMacro = (macroKey) => {
     const newHidden = [...hiddenMacros, macroKey];
     setHiddenMacros(newHidden);
-    localStorage.setItem('hiddenMacros', JSON.stringify(newHidden));
   };
 
   const updateMacroTags = (macroKey, newTags) => {
     const newMap = { ...macroTagsMap, [macroKey]: newTags };
     setMacroTagsMap(newMap);
-    localStorage.setItem('macroTagsMap', JSON.stringify(newMap));
   };
 
   const historicalSteps = useMemo(() => {

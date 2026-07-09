@@ -218,6 +218,12 @@ export function useAppState() {
   const [sessionNotes, setSessionNotes] = useIdbStorage('bxng_session_notes', []);
   const [language, setLanguage] = useIdbStorage('bxng_language', 'en');
   const [workoutTemplates, setWorkoutTemplates] = useIdbStorage('bxng_workout_templates', []);
+  const [hiddenMacros, setHiddenMacros] = useIdbStorage('bxng_hidden_macros', (() => {
+    try { return JSON.parse(localStorage.getItem('hiddenMacros')) || []; } catch { return []; }
+  })());
+  const [macroTagsMap, setMacroTagsMap] = useIdbStorage('bxng_macro_tags', (() => {
+    try { return JSON.parse(localStorage.getItem('macroTagsMap')) || {}; } catch { return {}; }
+  })());
 
   const t = (key) => {
     const keys = key.split('.');
@@ -268,6 +274,10 @@ export function useAppState() {
 
       setAppVersion(APP_VERSION);
     }
+
+    // Migration from localStorage to IndexedDB for macros
+    if (localStorage.getItem('hiddenMacros')) localStorage.removeItem('hiddenMacros');
+    if (localStorage.getItem('macroTagsMap')) localStorage.removeItem('macroTagsMap');
   }, [appVersion, weeks, currentWeekId, setWeeks, setCurrentWeekId, setAppVersion]);
 
   // Re-sync active week when the tab becomes visible again (handles multi-day PWA sessions)
@@ -328,6 +338,8 @@ export function useAppState() {
     sessionNotes, setSessionNotes,
     storageError, setStorageError,
     language, setLanguage, t,
-    workoutTemplates, setWorkoutTemplates
+    workoutTemplates, setWorkoutTemplates,
+    hiddenMacros, setHiddenMacros,
+    macroTagsMap, setMacroTagsMap
   };
 }
