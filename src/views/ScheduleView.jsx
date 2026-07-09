@@ -55,6 +55,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
   const quickAddInputRef = useRef(null);
   const [selectedMacroIds, setSelectedMacroIds] = useState([]);
   const [isMacroListOpen, setIsMacroListOpen] = useState(false);
+  const [macroSearchTerm, setMacroSearchTerm] = useState('');
   
   useEffect(() => {
     onDirtyStateChange?.(editingId !== null);
@@ -82,10 +83,24 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
     }
   });
 
+  const [macroTagsMap, setMacroTagsMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('macroTagsMap')) || {};
+    } catch {
+      return {};
+    }
+  });
+
   const hideMacro = (macroKey) => {
     const newHidden = [...hiddenMacros, macroKey];
     setHiddenMacros(newHidden);
     localStorage.setItem('hiddenMacros', JSON.stringify(newHidden));
+  };
+
+  const updateMacroTags = (macroKey, newTags) => {
+    const newMap = { ...macroTagsMap, [macroKey]: newTags };
+    setMacroTagsMap(newMap);
+    localStorage.setItem('macroTagsMap', JSON.stringify(newMap));
   };
 
   const historicalSteps = useMemo(() => {
@@ -109,7 +124,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                 if (step.name && step.name.trim() !== 'New Step') {
                   const key = step.name.trim().toLowerCase();
                   if (!stepsMap.has(key) && !hiddenMacros.includes(key)) {
-                    stepsMap.set(key, { ...step, originalKey: key, _isDefault: false, parentType: ex.type });
+                    stepsMap.set(key, { ...step, originalKey: key, _isDefault: false, parentType: ex.type, tags: macroTagsMap[key] || [] });
                   }
                 }
               });
@@ -123,7 +138,7 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
       if (a._isDefault !== b._isDefault) return a._isDefault ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-  }, [weeks, hiddenMacros]);
+  }, [weeks, hiddenMacros, macroTagsMap]);
 
   const getExerciseIcon = (type) => {
     switch (type) {
@@ -1045,27 +1060,54 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                           </button>
                           
                           {isMacroListOpen && (
-                            <div style={{ background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '250px', overflowY: 'auto', marginTop: '4px' }}>
-                              {historicalSteps.map(s => (
-                                <div key={s.originalKey} style={{ display: 'flex', alignItems: 'center', padding: '0.4rem 0.6rem', borderBottom: '1px solid var(--border-color)' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    checked={selectedMacroIds.includes(s.originalKey)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
-                                      else setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
-                                    }}
-                                    style={{ width: 'auto', flex: '0 0 auto', marginRight: '8px', cursor: 'pointer' }}
-                                  />
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', flex: 1, cursor: 'pointer' }} onClick={() => {
-                                    if (selectedMacroIds.includes(s.originalKey)) setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
-                                    else setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
-                                  }}>{getStepMacroLabel(s)}</span>
-                                </div>
-                              ))}
-                              {historicalSteps.length === 0 && (
-                                <div style={{ padding: '0.6rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nessuna macro salvata.</div>
-                              )}
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: '6px', maxHeight: '250px', display: 'flex', flexDirection: 'column', marginTop: '4px' }}>
+                              <div style={{ padding: '0.4rem' }}>
+                                <input 
+                                  type="text" 
+                                  placeholder="Cerca macro o tag..." 
+                                  value={macroSearchTerm}
+                                  onChange={(e) => setMacroSearchTerm(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ width: '100%', padding: '0.3rem 0.5rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-main)' }}
+                                />
+                              </div>
+                              <div style={{ overflowY: 'auto', flex: 1 }}>
+                                {historicalSteps.filter(s => {
+                                  if (!macroSearchTerm.trim()) return true;
+                                  const term = macroSearchTerm.toLowerCase();
+                                  if (s.name.toLowerCase().includes(term)) return true;
+                                  if (s.tags && s.tags.some(t => t.toLowerCase().includes(term))) return true;
+                                  return false;
+                                }).map(s => (
+                                  <div key={s.originalKey} style={{ display: 'flex', alignItems: 'center', padding: '0.4rem 0.6rem', borderBottom: '1px solid var(--border-color)' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedMacroIds.includes(s.originalKey)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
+                                        else setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
+                                      }}
+                                      style={{ width: 'auto', flex: '0 0 auto', marginRight: '8px', cursor: 'pointer' }}
+                                    />
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, cursor: 'pointer' }} onClick={() => {
+                                      if (selectedMacroIds.includes(s.originalKey)) setSelectedMacroIds(selectedMacroIds.filter(id => id !== s.originalKey));
+                                      else setSelectedMacroIds([...selectedMacroIds, s.originalKey]);
+                                    }}>
+                                      <span style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>{getStepMacroLabel(s)}</span>
+                                      {s.tags && s.tags.length > 0 && (
+                                        <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                          {s.tags.map(tag => (
+                                            <span key={tag} style={{ fontSize: '0.65rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0 4px', borderRadius: '4px' }}>{tag}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                                {historicalSteps.length === 0 && (
+                                  <div style={{ padding: '0.6rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nessuna macro salvata.</div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1098,8 +1140,46 @@ export function ScheduleView({ profile, schedule, setSchedule, weeks, setWeeks, 
                             if (!s) return null;
                             return (
                               <div key={id} style={{ padding: '0.4rem 0.6rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{s.name}</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{s.name}</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                                      {s.tags && s.tags.map(tag => (
+                                        <span key={tag} style={{ fontSize: '0.65rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          {tag}
+                                          {!s._isDefault && (
+                                            <button className="btn-text" style={{ padding: 0, margin: 0, color: 'var(--primary)', height: '12px' }} onClick={() => updateMacroTags(s.originalKey, s.tags.filter(t => t !== tag))}>×</button>
+                                          )}
+                                        </span>
+                                      ))}
+                                      {!s._isDefault && (
+                                        <input 
+                                          type="text" 
+                                          placeholder="+ tag" 
+                                          style={{ fontSize: '0.65rem', padding: '2px 4px', border: '1px dashed var(--border-color)', borderRadius: '4px', background: 'transparent', width: '80px', color: 'var(--text-main)' }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              if (e.target.value.trim()) {
+                                                const newTag = e.target.value.trim();
+                                                const currentTags = s.tags || [];
+                                                if (!currentTags.includes(newTag)) updateMacroTags(s.originalKey, [...currentTags, newTag]);
+                                                e.target.value = '';
+                                              }
+                                            }
+                                          }}
+                                          onBlur={(e) => {
+                                            if (e.target.value.trim()) {
+                                              const newTag = e.target.value.trim();
+                                              const currentTags = s.tags || [];
+                                              if (!currentTags.includes(newTag)) updateMacroTags(s.originalKey, [...currentTags, newTag]);
+                                              e.target.value = '';
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
                                   {!s._isDefault && (
                                     <button 
                                       className="btn-icon danger" 
